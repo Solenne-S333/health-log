@@ -1560,6 +1560,13 @@ function renderSettings(){
       <button class="btn primary small" style="flex:0 0 auto" onclick="addSoul()">Add</button>
     </div>
 
+    <h2>Beta &amp; feedback</h2>
+    <p class="sub">You're trying an early version — thank you. 💛 Your notes shape what it becomes.</p>
+    <div class="inline">
+      <button class="btn primary small" onclick="sendFeedback()">Send feedback</button>
+      <button class="btn ghost small" onclick="showWelcome()">Show intro</button>
+    </div>
+
     <h2>Your data</h2>
     <p class="sub">Everything is stored only in this browser on this device — nothing is sent anywhere. Back up regularly so you don't lose it.</p>
     <div class="inline">
@@ -1858,9 +1865,47 @@ function syncCardHTML(){
   </div>`;
 }
 
+/* ============================================================
+   WELCOME (first run) + FEEDBACK  (for beta testers)
+   ============================================================ */
+function hasAnyData(){
+  return !!(DB.symptoms.length||DB.medDoses.length||DB.bp.length||DB.sleep.length||DB.meals.length||DB.moods.length||DB.soul.length||DB.weights.length);
+}
+function showWelcome(){
+  const inner=`
+    <p style="font-size:15px;line-height:1.55">A gentle, private place for your health — symptoms, meds, blood pressure, sleep, mood, soul time, weight, and the context around eating.</p>
+    <div class="insight card" style="margin-top:12px;border-color:var(--good)">
+      <p class="ih">🔒 Yours alone</p>
+      <p class="sub" style="margin:0">Everything you log stays on <b>this device</b>. No account, no cloud, no one else can see it — not even whoever shared this with you.</p>
+    </div>
+    <ul style="font-size:14px;line-height:1.7;margin:12px 2px 0;padding-left:20px;color:var(--muted)">
+      <li>Tap a module on the <b>Log</b> screen to add something — time defaults to “now.”</li>
+      <li>Spot patterns in <b>Trends</b>; make a doctor-ready page in <b>Summary</b>.</li>
+      <li><b>Install</b> it to your home screen (Settings) so it opens like an app, offline.</li>
+    </ul>
+    <div class="actions"><button class="btn primary" id="wok">Start</button></div>`;
+  sheet("Welcome to Health Log 🌿", inner, (root,close)=>{
+    root.querySelector("#wok").onclick=()=>{ try{localStorage.setItem("healthlog.welcomed","1");}catch(e){} close(); };
+  });
+}
+function maybeWelcome(){
+  let seen; try{ seen=localStorage.getItem("healthlog.welcomed"); }catch(e){ return; }
+  if(seen) return;
+  if(hasAnyData()){ try{localStorage.setItem("healthlog.welcomed","1");}catch(e){} return; } // existing users: mark seen, no popup
+  showWelcome();
+}
+function sendFeedback(){
+  const note=`Health Log — feedback\n\n• What I liked:\n• What confused me:\n• What I'd change:\n\n— sent from the app (${isStandalone()?"installed":"browser"})`;
+  if(navigator.share){ navigator.share({title:"Health Log feedback", text:note}).catch(()=>{}); return; }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(note).then(()=>toast("Copied — paste it in a text to Solenne 💛")).catch(()=>toast("Jot your thoughts & text them to Solenne 💛"));
+  } else toast("Jot your thoughts & text them to Solenne 💛");
+}
+
 /* boot */
 render();
 initSyncOnBoot();
+maybeWelcome();
 </script>
 </body>
 </html>
