@@ -1,0 +1,1677 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0f141b" />
+<link rel="manifest" href="./manifest.webmanifest" />
+<link rel="apple-touch-icon" href="./icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="Health Log" />
+<title>Health Log</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --surface:#ffffff; --surface-2:#eef1f5; --line:#dde2ea;
+    --text:#141a22; --muted:#5b6672; --accent:#2f6df6; --accent-soft:#e6efff;
+    --danger:#c8443c; --good:#1f9d63; --warn:#c98a12;
+    --sym:#e0567a; --med:#7a5cf0; --bp:#c8443c; --sleep:#2b7fd4; --meal:#1f9d63; --mood:#0d9b8a; --soul:#c77d2e; --weight:#9c5c8f;
+    --s-mood:#0d9b8a; --s-energy:#c77d2e; --grid:rgba(20,26,34,.09); --axis:#98a2b0;
+    --radius:14px; --shadow:0 1px 2px rgba(16,24,40,.06),0 4px 16px rgba(16,24,40,.05);
+    --tap:52px; --maxw:720px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0f141b; --surface:#161d27; --surface-2:#1e2633; --line:#2a3543;
+      --text:#e8edf4; --muted:#95a2b3; --accent:#5b8cff; --accent-soft:#1b2740;
+      --danger:#f0736b; --good:#4cc389; --warn:#e0aa3e;
+      --sym:#f07a9a; --med:#a48bff; --bp:#f0736b; --sleep:#5aa6ef; --meal:#4cc389; --mood:#3dc9b5; --soul:#e3a24f; --weight:#c184b3;
+      --s-mood:#22a08d; --s-energy:#c07f2e; --grid:rgba(232,237,244,.12); --axis:#7c8896;
+      --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 20px rgba(0,0,0,.3);
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--text);
+    font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-text-size-adjust:100%; padding-bottom:calc(72px + env(safe-area-inset-bottom));
+  }
+  .wrap{max-width:var(--maxw); margin:0 auto; padding:16px 16px 8px;}
+  h1{font-size:20px; margin:4px 0 2px; letter-spacing:-.01em}
+  h2{font-size:16px; margin:20px 2px 10px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; font-weight:700}
+  .sub{color:var(--muted); font-size:13px; margin:0 2px 14px}
+  button{font-family:inherit; cursor:pointer}
+  .card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow)}
+
+  /* ---- Quick-log grid ---- */
+  .modgrid{display:grid; grid-template-columns:repeat(2,1fr); gap:12px}
+  .modbtn{
+    display:flex; flex-direction:column; align-items:flex-start; gap:6px;
+    min-height:88px; padding:14px 14px; border:1px solid var(--line); border-radius:var(--radius);
+    background:var(--surface); color:var(--text); text-align:left; box-shadow:var(--shadow);
+    transition:transform .05s ease;
+  }
+  .modbtn:active{transform:scale(.98)}
+  .modbtn .ico{font-size:24px; line-height:1}
+  .modbtn .lbl{font-weight:700; font-size:16px}
+  .modbtn .hint{font-size:12px; color:var(--muted)}
+  .stripe{width:34px; height:4px; border-radius:3px; margin-top:2px}
+
+  /* chips */
+  .chips{display:flex; flex-wrap:wrap; gap:8px; margin:2px 0 4px}
+  .chip{
+    border:1px solid var(--line); background:var(--surface-2); color:var(--text);
+    border-radius:999px; padding:9px 13px; font-size:14px; font-weight:600; min-height:40px;
+  }
+  .chip:active{background:var(--accent-soft)}
+  .chip.add{border-style:dashed; color:var(--muted); font-weight:500}
+  .chip .meta{color:var(--muted); font-weight:500; font-size:12px; margin-left:6px}
+
+  /* ---- Forms ---- */
+  label{display:block; font-size:13px; font-weight:600; color:var(--muted); margin:12px 2px 5px}
+  input,select,textarea{
+    width:100%; font:inherit; color:var(--text); background:var(--surface);
+    border:1px solid var(--line); border-radius:12px; padding:13px 12px; min-height:var(--tap);
+  }
+  textarea{min-height:76px; resize:vertical}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--accent); border-color:transparent}
+  .row{display:flex; gap:10px}
+  .row>div{flex:1}
+  .inline{display:flex; gap:8px; flex-wrap:wrap}
+  .seg{display:flex; gap:0; border:1px solid var(--line); border-radius:12px; overflow:hidden}
+  .seg button{flex:1; border:0; background:var(--surface); color:var(--text); padding:12px 6px; min-height:var(--tap); font-weight:600; font-size:14px; border-right:1px solid var(--line)}
+  .seg button:last-child{border-right:0}
+  .seg button.on{background:var(--accent); color:#fff}
+  .sevrow{display:flex; gap:6px; flex-wrap:wrap}
+  .sev{width:44px; height:44px; border-radius:10px; border:1px solid var(--line); background:var(--surface); font-weight:700}
+  .sev.on{background:var(--accent); color:#fff; border-color:transparent}
+  .faces{display:flex; gap:8px}
+  .face{flex:1; min-height:60px; border-radius:12px; border:1px solid var(--line); background:var(--surface); font-size:26px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px}
+  .face .fl{font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.03em}
+  .face.on{background:var(--accent-soft); border-color:var(--accent)}
+  .face.on .fl{color:var(--accent)}
+  .actions{display:flex; gap:10px; margin-top:18px}
+  .btn{flex:1; border:0; border-radius:12px; padding:15px; min-height:var(--tap); font-weight:700; font-size:16px}
+  .btn.primary{background:var(--accent); color:#fff}
+  .btn.ghost{background:var(--surface-2); color:var(--text)}
+  .btn.small{flex:0 0 auto; padding:10px 14px; min-height:44px; font-size:14px}
+  .btn.danger{background:transparent; color:var(--danger); border:1px solid var(--line)}
+  fieldset{border:1px solid var(--line); border-radius:12px; margin:14px 0 0; padding:6px 12px 14px}
+  legend{font-size:12px; font-weight:700; color:var(--muted); padding:0 6px; text-transform:uppercase; letter-spacing:.04em}
+  .muted{color:var(--muted)}
+  .hidden{display:none !important}
+
+  /* ---- Timeline / entries ---- */
+  .entry{display:flex; gap:12px; padding:13px 14px; border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); margin-bottom:10px}
+  .entry .bar{width:4px; border-radius:3px; flex:0 0 4px}
+  .entry .body{flex:1; min-width:0}
+  .entry .top{display:flex; justify-content:space-between; gap:10px; align-items:baseline}
+  .entry .ttl{font-weight:700}
+  .entry .when{font-size:12px; color:var(--muted); white-space:nowrap}
+  .entry .det{font-size:14px; color:var(--text); margin-top:3px; word-wrap:break-word}
+  .entry .note{font-size:13px; color:var(--muted); margin-top:4px; font-style:italic}
+  .tag{display:inline-block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; padding:2px 7px; border-radius:6px; color:#fff}
+  .daygroup{margin-top:6px}
+  .dayhdr{font-size:13px; font-weight:700; color:var(--muted); margin:16px 4px 8px; position:sticky; top:0; background:var(--bg); padding:4px 0; z-index:1}
+  .filterbar{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:6px}
+  .fchip{border:1px solid var(--line); background:var(--surface); color:var(--muted); border-radius:999px; padding:7px 12px; font-size:13px; font-weight:600; min-height:38px}
+  .fchip.on{background:var(--text); color:var(--bg); border-color:transparent}
+  .empty{text-align:center; color:var(--muted); padding:40px 20px; font-size:14px}
+
+  /* stats */
+  .statgrid{display:grid; grid-template-columns:repeat(2,1fr); gap:10px}
+  .stat{padding:12px 14px}
+  .stat .k{font-size:12px; color:var(--muted); font-weight:600}
+  .stat .v{font-size:22px; font-weight:800; letter-spacing:-.02em; margin-top:2px}
+  .stat .s{font-size:12px; color:var(--muted)}
+
+  /* ---- Nav ---- */
+  nav{
+    position:fixed; left:0; right:0; bottom:0; z-index:50;
+    background:var(--surface); border-top:1px solid var(--line);
+    display:flex; padding:6px 4px calc(6px + env(safe-area-inset-bottom));
+  }
+  nav button{
+    flex:1; background:none; border:0; color:var(--muted); padding:6px 2px; border-radius:10px;
+    display:flex; flex-direction:column; align-items:center; gap:3px; font-size:11px; font-weight:600;
+  }
+  nav button .ni{font-size:20px; line-height:1}
+  nav button.on{color:var(--accent)}
+
+  /* modal */
+  .sheet-back{position:fixed; inset:0; background:rgba(6,10,16,.5); z-index:100; display:flex; align-items:flex-end; justify-content:center}
+  .sheet{background:var(--bg); width:100%; max-width:var(--maxw); max-height:92vh; overflow:auto; border-radius:18px 18px 0 0; padding:8px 16px calc(24px + env(safe-area-inset-bottom))}
+  .sheet-hd{display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; background:var(--bg); padding:10px 2px 8px; z-index:2}
+  .sheet-hd .x{background:var(--surface-2); border:0; width:38px; height:38px; border-radius:50%; font-size:18px; color:var(--text)}
+  .grab{width:40px; height:4px; background:var(--line); border-radius:3px; margin:6px auto 2px}
+  @media (min-width:560px){ .sheet-back{align-items:center} .sheet{border-radius:18px; margin:20px} }
+
+  .toast{position:fixed; left:50%; transform:translateX(-50%); bottom:calc(84px + env(safe-area-inset-bottom)); background:var(--text); color:var(--bg); padding:11px 18px; border-radius:999px; font-weight:600; font-size:14px; z-index:200; box-shadow:var(--shadow)}
+
+  /* print / doctor summary */
+  @media print{
+    nav,.noprint{display:none !important}
+    body{background:#fff; color:#000; padding:0}
+    .wrap{max-width:100%}
+    .card,.entry{box-shadow:none; border-color:#bbb}
+    .dayhdr{position:static}
+    a{color:#000}
+  }
+  .report h1{font-size:22px}
+  .report table{width:100%; border-collapse:collapse; font-size:13px; margin:6px 0 14px}
+  .report th,.report td{border:1px solid var(--line); padding:7px 9px; text-align:left; vertical-align:top}
+  .report th{background:var(--surface-2); font-size:11px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted)}
+  .report caption{text-align:left; font-weight:700; margin:14px 0 6px; font-size:15px}
+
+  /* trends / charts */
+  .chartcard{padding:14px 14px 12px; margin-bottom:14px}
+  .chartcard .ct{display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom:2px}
+  .chartcard .ct h3{font-size:15px; margin:0; font-weight:700}
+  .chartcard .ct .now{font-size:13px; color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap}
+  .chartcard .csub{font-size:12px; color:var(--muted); margin:0 0 10px}
+  .chart{width:100%; height:auto; display:block; touch-action:pan-y}
+  .chart .grid{stroke:var(--grid); stroke-width:1}
+  .chart .axis{stroke:var(--axis); stroke-width:1; opacity:.5}
+  .chart .albl{fill:var(--muted); font-size:9px; font-variant-numeric:tabular-nums}
+  .chart .line{fill:none; stroke-width:2; stroke-linejoin:round; stroke-linecap:round}
+  .chart .dot{stroke:var(--surface); stroke-width:1.5}
+  .chart .hit{fill:transparent; cursor:pointer}
+  .chart .bar{rx:2}
+  .legend{display:flex; gap:14px; flex-wrap:wrap; margin-top:8px}
+  .legend span{display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); font-weight:600}
+  .legend i{width:14px; height:0; border-top-width:2px; border-top-style:solid; display:inline-block}
+  .charttip{position:fixed; z-index:300; background:var(--text); color:var(--bg); padding:7px 10px; border-radius:8px; font-size:12px; line-height:1.35; pointer-events:none; box-shadow:var(--shadow); max-width:230px; opacity:0; transition:opacity .08s}
+  .charttip.on{opacity:1}
+  .charttip b{font-weight:700}
+  .insight{padding:13px 14px; margin-bottom:10px}
+  .insight .ih{font-size:13px; font-weight:700; margin:0 0 8px}
+  .cmp{display:flex; align-items:stretch; gap:10px}
+  .cmp .side{flex:1; background:var(--surface-2); border-radius:10px; padding:9px 11px}
+  .cmp .side .lb{font-size:11px; color:var(--muted); font-weight:600}
+  .cmp .side .vv{font-size:20px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums; margin-top:2px}
+  .cmp .side .n{font-size:11px; color:var(--muted)}
+  .delta{align-self:center; font-size:12px; font-weight:700; padding:3px 8px; border-radius:999px; white-space:nowrap}
+  .delta.up{color:var(--good)} .delta.down{color:var(--danger)} .delta.flat{color:var(--muted)}
+  .disclaim{font-size:12px; color:var(--muted); font-style:italic; margin:2px 2px 12px}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+
+<nav id="nav">
+  <button data-tab="log" class="on"><span class="ni">➕</span>Log</button>
+  <button data-tab="history"><span class="ni">🗂️</span>History</button>
+  <button data-tab="correlate"><span class="ni">🔗</span>Correlate</button>
+  <button data-tab="trends"><span class="ni">📈</span>Trends</button>
+  <button data-tab="summary"><span class="ni">🩺</span>Summary</button>
+  <button data-tab="settings"><span class="ni">⚙️</span>Settings</button>
+</nav>
+
+<script>
+"use strict";
+/* ============================================================
+   Health Log — single-file offline personal health tracker.
+   All data lives in this browser (localStorage). No network.
+   ============================================================ */
+
+const DB_KEY = "healthlog.v1";
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const nowISO = () => new Date().toISOString();
+
+const DEFAULT_DB = {
+  symptoms: [],
+  meds: [],          // definitions: {id,name,type,defaultDose}
+  medDoses: [],      // {id, medId, takenAt, dose, notes, createdAt}
+  bp: [],            // {id, takenAt, systolic, diastolic, pulse, notes, createdAt}
+  sleep: [],         // {id, timestamp, hours, quality, notes, createdAt}
+  meals: [],         // {id, timeEaten, location, source, size, description, mood, situation, drink{...}, after[], notes, createdAt}
+  moods: [],         // {id, timestamp, rating(1-5), energy(1-5|null), tags[], notes, createdAt, updatedAt}
+  soul: [],          // {id, timestamp, activity, durationMinutes, rating(1-5|null), notes, createdAt, updatedAt}
+  weights: [],       // {id, timestamp, weight(number), unit("lb"|"kg"), notes, createdAt, updatedAt}
+  weightUnit: "lb",
+  commonSymptoms: ["Headache", "Fatigue", "Nausea", "Joint pain", "Dizziness", "Brain fog"],
+  commonMoods: ["Calm", "Anxious", "Low", "Irritable", "Content", "Overwhelmed", "Hopeful", "Flat"],
+  commonSoul: ["Kingdom tour", "Coffee ritual", "Time with Presence", "Plant tending", "Baking", "Journaling", "Meditation"],
+};
+const MOOD_FACES = [ {v:1,e:"😞",l:"Awful"}, {v:2,e:"😕",l:"Low"}, {v:3,e:"😐",l:"Okay"}, {v:4,e:"🙂",l:"Good"}, {v:5,e:"😄",l:"Great"} ];
+
+function load(){
+  try{
+    const raw = localStorage.getItem(DB_KEY);
+    if(!raw) return structuredClone(DEFAULT_DB);
+    const d = JSON.parse(raw);
+    return Object.assign(structuredClone(DEFAULT_DB), d);
+  }catch(e){ console.warn("load failed", e); return structuredClone(DEFAULT_DB); }
+}
+let DB = load();
+function save(){ try{ localStorage.setItem(DB_KEY, JSON.stringify(DB)); }catch(e){ toast("⚠️ Could not save — storage full?"); } }
+
+/* ---------- helpers ---------- */
+const MED_TYPES = ["Injection","Patch","Biologic","Eye drops","Other"];
+const MEAL_SOURCES = ["Homemade","Takeout","Restaurant"];
+const MEAL_SIZES = ["Small","Medium","Large"];
+
+const pad = n => String(n).padStart(2,"0");
+function toLocalInput(d){ // Date -> "YYYY-MM-DDTHH:MM" for datetime-local
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function nowLocalInput(){ return toLocalInput(new Date()); }
+function fmtDateTime(iso){
+  const d=new Date(iso);
+  return d.toLocaleString(undefined,{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
+}
+function fmtTime(iso){ return new Date(iso).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"}); }
+function fmtDay(iso){
+  const d=new Date(iso), t=new Date();
+  const same=(a,b)=>a.toDateString()===b.toDateString();
+  if(same(d,t)) return "Today";
+  const y=new Date(t); y.setDate(t.getDate()-1);
+  if(same(d,y)) return "Yesterday";
+  return d.toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric",year:d.getFullYear()!==t.getFullYear()?"numeric":undefined});
+}
+function fmtDayShort(iso){ return new Date(iso).toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"}); }
+function ago(iso){
+  const ms=Date.now()-new Date(iso).getTime();
+  const m=Math.round(ms/60000);
+  if(m<1) return "just now";
+  if(m<60) return m+"m ago";
+  const h=Math.round(m/60);
+  if(h<24) return h+"h ago";
+  const d=Math.round(h/24);
+  return d+"d ago";
+}
+function durHuman(min){
+  if(min==null||min==="") return "";
+  min=Number(min); if(isNaN(min)) return "";
+  if(min<60) return min+" min";
+  const h=Math.floor(min/60), m=min%60;
+  return m? `${h}h ${m}m` : `${h}h`;
+}
+function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+function toast(msg){
+  const t=document.createElement("div"); t.className="toast"; t.textContent=msg;
+  document.body.appendChild(t); setTimeout(()=>t.remove(),1900);
+}
+
+/* Unified event stream for history/correlate/summary.
+   Each -> {id, type, ts(ISO), title, detail, note, module} */
+function allEvents(){
+  const ev=[];
+  for(const s of DB.symptoms) ev.push({id:s.id,module:"symptom",ts:s.timestamp,
+    title:s.name||"Symptom",
+    detail:[s.severity!=null?`severity ${s.severity}/10`:"", durHuman(s.durationMinutes)].filter(Boolean).join(" · "),
+    note:s.notes, raw:s});
+  for(const d of DB.medDoses){ const m=DB.meds.find(x=>x.id===d.medId);
+    ev.push({id:d.id,module:"med",ts:d.takenAt,
+      title:(m?m.name:"Medication")+(m?` (${m.type})`:""),
+      detail:d.dose?`dose: ${d.dose}`:"", note:d.notes, raw:d}); }
+  for(const b of DB.bp) ev.push({id:b.id,module:"bp",ts:b.takenAt,
+    title:`BP ${b.systolic}/${b.diastolic}`,
+    detail:b.pulse?`pulse ${b.pulse}`:"", note:b.notes, raw:b});
+  for(const s of DB.sleep) ev.push({id:s.id,module:"sleep",ts:s.timestamp,
+    title:`Slept ${s.hours} h`,
+    detail:s.quality?`quality ${s.quality}/5`:"", note:s.notes, raw:s});
+  for(const m of DB.meals){
+    const parts=[m.source,m.size&&m.size+" meal",m.location].filter(Boolean).join(" · ");
+    const after=(m.after&&m.after.length)?"↳ after: "+m.after.map(a=>a.name+(a.durationMinutes?` (${durHuman(a.durationMinutes)})`:"")).join(", "):"";
+    ev.push({id:m.id,module:"meal",ts:m.timeEaten,
+      title:m.description||"Meal",
+      detail:[parts, m.mood&&("mood: "+m.mood), m.drink&&m.drink.had&&("drink: "+[m.drink.what,m.drink.timing,m.drink.minutesBefore&&m.drink.minutesBefore+"m before"].filter(Boolean).join(" ")), m.situation, after].filter(Boolean).join(" · "),
+      note:m.notes, raw:m});
+  }
+  for(const md of DB.moods) ev.push({id:md.id,module:"mood",ts:md.timestamp,
+    title:`${moodFace(md.rating)} ${moodLabel(md.rating)}${md.rating?` (${md.rating}/5)`:""}`.trim(),
+    detail:[ (md.tags&&md.tags.length)?md.tags.join(", "):"", md.energy?`energy ${md.energy}/5`:"" ].filter(Boolean).join(" · "),
+    note:md.notes, raw:md});
+  for(const so of DB.soul) ev.push({id:so.id,module:"soul",ts:so.timestamp,
+    title:so.activity||"Soul time",
+    detail:[ durHuman(so.durationMinutes), so.rating?`restoring ${so.rating}/5`:"" ].filter(Boolean).join(" · "),
+    note:so.notes, raw:so});
+  for(const w of DB.weights) ev.push({id:w.id,module:"weight",ts:w.timestamp,
+    title:`${w.weight} ${w.unit||DB.weightUnit||"lb"}`,
+    detail:"", note:w.notes, raw:w});
+  ev.sort((a,b)=> new Date(b.ts)-new Date(a.ts));
+  return ev;
+}
+const MOD = {
+  symptom:{label:"Symptom",color:"var(--sym)",ico:"🌡️"},
+  med:{label:"Med",color:"var(--med)",ico:"💊"},
+  bp:{label:"BP",color:"var(--bp)",ico:"❤️"},
+  sleep:{label:"Sleep",color:"var(--sleep)",ico:"😴"},
+  meal:{label:"Meal",color:"var(--meal)",ico:"🍽️"},
+  mood:{label:"Mood",color:"var(--mood)",ico:"🧠"},
+  soul:{label:"Soul time",color:"var(--soul)",ico:"🌿"},
+  weight:{label:"Weight",color:"var(--weight)",ico:"⚖️"},
+};
+function moodFace(r){ const f=MOOD_FACES.find(x=>x.v===Number(r)); return f?f.e:""; }
+function moodLabel(r){ const f=MOOD_FACES.find(x=>x.v===Number(r)); return f?f.l:""; }
+
+/* ============================================================
+   ROUTER
+   ============================================================ */
+let TAB="log";
+const app=()=>document.getElementById("app");
+function setTab(t){
+  TAB=t;
+  document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("on",b.dataset.tab===t));
+  render();
+  window.scrollTo(0,0);
+}
+document.getElementById("nav").addEventListener("click",e=>{
+  const b=e.target.closest("button[data-tab]"); if(b) setTab(b.dataset.tab);
+});
+
+function render(){
+  if(TAB==="log") return renderLog();
+  if(TAB==="history") return renderHistory();
+  if(TAB==="correlate") return renderCorrelate();
+  if(TAB==="trends") return renderTrends();
+  if(TAB==="summary") return renderSummary();
+  if(TAB==="settings") return renderSettings();
+}
+
+/* ============================================================
+   LOG (quick-log home)
+   ============================================================ */
+function renderLog(){
+  const ev=allEvents();
+  const recent=ev.slice(0,3);
+  app().innerHTML = `
+    <h1>Quick log</h1>
+    <p class="sub">Tap a module. Time defaults to now — change it if you're logging something earlier.</p>
+    <div class="modgrid">
+      ${modBtn("symptom","🌡️","Symptom","time · severity · notes")}
+      ${modBtn("med","💊","Medication","dose + interval tracking")}
+      ${modBtn("bp","❤️","Blood pressure","systolic / diastolic")}
+      ${modBtn("sleep","😴","Sleep","hours · quality")}
+      ${modBtn("meal","🍽️","Meal context","context around eating")}
+      ${modBtn("mood","🧠","Mood","how you feel right now")}
+      ${modBtn("soul","🌿","Soul time","nourishing time for you")}
+      ${modBtn("weight","⚖️","Weight","log a weigh-in")}
+      <button class="modbtn" onclick="setTab('summary')">
+        <span class="ico">🩺</span>
+        <span class="lbl">Doctor summary</span>
+        <span class="hint">printable for appointments</span>
+      </button>
+    </div>
+
+    <h2>How are you right now? — one tap logs it</h2>
+    <div class="faces">
+      ${MOOD_FACES.map(f=>`<button class="face" onclick="quickMood(${f.v})"><span>${f.e}</span><span class="fl">${f.l}</span></button>`).join("")}
+    </div>
+    <p class="sub" style="margin-top:8px">Tap a face to log instantly, or use the Mood button above to add tags &amp; energy.</p>
+
+    <h2>Common symptoms — one tap</h2>
+    <div class="chips">
+      ${DB.commonSymptoms.map(n=>`<button class="chip" onclick="openSymptom(null,${JSON.stringify(n).replace(/"/g,'&quot;')})">${esc(n)}</button>`).join("")}
+      <button class="chip add" onclick="setTab('settings')">+ manage</button>
+    </div>
+
+    <h2>Soul time — one tap to log it</h2>
+    <div class="chips">
+      ${DB.commonSoul.map(n=>`<button class="chip" onclick="openSoul(null,${JSON.stringify(n).replace(/"/g,'&quot;')})">${esc(n)}</button>`).join("")}
+      <button class="chip add" onclick="setTab('settings')">+ manage</button>
+    </div>
+
+    <h2>Your medications — tap to log a dose</h2>
+    <div class="chips">
+      ${DB.meds.length? DB.meds.map(m=>{
+        const last=lastDose(m.id);
+        return `<button class="chip" onclick="openMed(null,'${m.id}')">${esc(m.name)}<span class="meta">${last?ago(last.takenAt):"no doses yet"}</span></button>`;
+      }).join("") : `<span class="muted" style="font-size:14px">No meds yet.</span>`}
+      <button class="chip add" onclick="setTab('settings')">+ add med</button>
+    </div>
+
+    ${recent.length?`
+      <h2>Just logged</h2>
+      <div>${recent.map(entryHTML).join("")}</div>
+      <button class="btn ghost" style="margin-top:4px" onclick="setTab('history')">View full history →</button>
+    `:""}
+  `;
+}
+function modBtn(mod,ico,lbl,hint){
+  return `<button class="modbtn" onclick="openForm('${mod}')">
+    <span class="ico">${ico}</span>
+    <span class="lbl">${lbl}</span>
+    <span class="hint">${hint}</span>
+    <span class="stripe" style="background:${MOD[mod].color}"></span>
+  </button>`;
+}
+function lastDose(medId){
+  const ds=DB.medDoses.filter(d=>d.medId===medId).sort((a,b)=>new Date(b.takenAt)-new Date(a.takenAt));
+  return ds[0]||null;
+}
+
+function openForm(mod){
+  if(mod==="symptom") return openSymptom();
+  if(mod==="med") return openMed();
+  if(mod==="bp") return openBP();
+  if(mod==="sleep") return openSleep();
+  if(mod==="meal") return openMeal();
+  if(mod==="mood") return openMood();
+  if(mod==="soul") return openSoul();
+  if(mod==="weight") return openWeight();
+}
+function quickMood(rating){
+  DB.moods.push({ id:uid(), timestamp:nowISO(), rating, energy:null, tags:[], notes:"", createdAt:nowISO(), updatedAt:nowISO() });
+  save(); render(); toast(`${moodFace(rating)} Mood logged — ${moodLabel(rating)}`);
+}
+
+/* ============================================================
+   MODAL SHELL
+   ============================================================ */
+function sheet(title, inner, onMount){
+  const back=document.createElement("div"); back.className="sheet-back";
+  back.innerHTML=`<div class="sheet">
+    <div class="grab"></div>
+    <div class="sheet-hd"><strong>${esc(title)}</strong><button class="x" aria-label="Close">✕</button></div>
+    <div class="sheet-body">${inner}</div>
+  </div>`;
+  document.body.appendChild(back);
+  const close=()=>back.remove();
+  back.addEventListener("click",e=>{ if(e.target===back) close(); });
+  back.querySelector(".x").addEventListener("click",close);
+  back._close=close;
+  if(onMount) onMount(back, close);
+  return back;
+}
+function val(scope,id){ const el=scope.querySelector("#"+id); return el?el.value.trim():""; }
+
+/* ============================================================
+   SYMPTOM
+   ============================================================ */
+function openSymptom(existing=null, prefillName=""){
+  const s = existing || {};
+  const sev = s.severity ?? null;
+  const inner = `
+    <label>Symptom</label>
+    <div class="chips" id="symChips">
+      ${DB.commonSymptoms.map(n=>`<button type="button" class="chip" data-n="${esc(n)}">${esc(n)}</button>`).join("")}
+    </div>
+    <input id="symName" placeholder="e.g. Headache" value="${esc(s.name||prefillName)}" />
+    <div class="row">
+      <div><label>Time noticed</label><input type="datetime-local" id="symTime" value="${s.timestamp?toLocalInput(new Date(s.timestamp)):nowLocalInput()}" /></div>
+      <div><label>Duration (min)</label><input type="number" inputmode="numeric" id="symDur" placeholder="optional" value="${s.durationMinutes??""}" /></div>
+    </div>
+    <label>Severity (1–10)</label>
+    <div class="sevrow" id="symSev">
+      ${Array.from({length:10},(_,i)=>i+1).map(n=>`<button type="button" class="sev ${sev===n?"on":""}" data-v="${n}">${n}</button>`).join("")}
+    </div>
+    <label>Notes</label>
+    <textarea id="symNotes" placeholder="free text — what it felt like, triggers…">${esc(s.notes||"")}</textarea>
+    <div class="actions">
+      ${existing?`<button class="btn danger small" id="del">Delete</button>`:""}
+      <button class="btn ghost" id="cancel">Cancel</button>
+      <button class="btn primary" id="ok">${existing?"Save":"Log symptom"}</button>
+    </div>`;
+  sheet(existing?"Edit symptom":"Log symptom", inner, (root,close)=>{
+    let severity=sev;
+    root.querySelectorAll("#symSev .sev").forEach(b=>b.onclick=()=>{
+      severity=Number(b.dataset.v);
+      root.querySelectorAll("#symSev .sev").forEach(x=>x.classList.toggle("on",x===b));
+    });
+    root.querySelectorAll("#symChips .chip").forEach(b=>b.onclick=()=>{ root.querySelector("#symName").value=b.dataset.n; });
+    root.querySelector("#cancel").onclick=close;
+    const delBtn=root.querySelector("#del"); if(delBtn) delBtn.onclick=()=>{ if(confirm("Delete this symptom entry?")){ DB.symptoms=DB.symptoms.filter(x=>x.id!==existing.id); save(); close(); render(); toast("Deleted"); } };
+    root.querySelector("#ok").onclick=()=>{
+      const name=val(root,"symName"); if(!name){ toast("Add a symptom name"); return; }
+      const rec={
+        id: existing?existing.id:uid(),
+        name,
+        timestamp: new Date(root.querySelector("#symTime").value||Date.now()).toISOString(),
+        durationMinutes: val(root,"symDur")||null,
+        severity,
+        notes: val(root,"symNotes"),
+        createdAt: existing?existing.createdAt:nowISO(), updatedAt:nowISO(),
+      };
+      if(existing){ const i=DB.symptoms.findIndex(x=>x.id===existing.id); DB.symptoms[i]=rec; }
+      else DB.symptoms.push(rec);
+      // learn new common symptom
+      if(!DB.commonSymptoms.some(c=>c.toLowerCase()===name.toLowerCase())) DB.commonSymptoms.push(name);
+      save(); close(); render(); toast("✓ Symptom logged");
+    };
+  });
+}
+
+/* ============================================================
+   MEDICATION DOSE  (defs managed in Settings)
+   ============================================================ */
+function openMed(existing=null, medId=null){
+  if(DB.meds.length===0){
+    sheet("No medications yet",`<p class="sub">Add your intermittent meds first (injections, patches, biologics, eye drops) in Settings — then logging a dose is one tap.</p>
+      <div class="actions"><button class="btn ghost" id="cancel">Close</button><button class="btn primary" id="go">Go to Settings</button></div>`,
+      (root,close)=>{ root.querySelector("#cancel").onclick=close; root.querySelector("#go").onclick=()=>{close(); setTab("settings");}; });
+    return;
+  }
+  const d=existing||{};
+  const selMed = existing?existing.medId : (medId||DB.meds[0].id);
+  const curMed = DB.meds.find(m=>m.id===selMed)||DB.meds[0];
+  const inner=`
+    <label>Medication</label>
+    <select id="medSel">${DB.meds.map(m=>`<option value="${m.id}" ${m.id===selMed?"selected":""}>${esc(m.name)} — ${esc(m.type)}</option>`).join("")}</select>
+    <div id="lastInfo" class="sub" style="margin-top:8px"></div>
+    <div class="row">
+      <div><label>Date / time taken</label><input type="datetime-local" id="medTime" value="${d.takenAt?toLocalInput(new Date(d.takenAt)):nowLocalInput()}" /></div>
+      <div><label>Dose</label><input id="medDose" placeholder="e.g. 40 mg" value="${esc(d.dose|| (existing?"":curMed.defaultDose||""))}" /></div>
+    </div>
+    <label>Notes</label>
+    <textarea id="medNotes" placeholder="site, side effects…">${esc(d.notes||"")}</textarea>
+    <div class="actions">
+      ${existing?`<button class="btn danger small" id="del">Delete</button>`:""}
+      <button class="btn ghost" id="cancel">Cancel</button>
+      <button class="btn primary" id="ok">${existing?"Save":"Log dose"}</button>
+    </div>`;
+  sheet(existing?"Edit dose":"Log dose", inner, (root,close)=>{
+    const info=root.querySelector("#lastInfo");
+    const upd=()=>{
+      const id=root.querySelector("#medSel").value;
+      const last=lastDose(id);
+      const m=DB.meds.find(x=>x.id===id);
+      const doseEl=root.querySelector("#medDose");
+      if(!existing && m && !doseEl.value) doseEl.value=m.defaultDose||"";
+      info.innerHTML = last? `Last taken <strong>${fmtDateTime(last.takenAt)}</strong> (${ago(last.takenAt)})${last.dose?` · ${esc(last.dose)}`:""}` : "No prior doses logged.";
+    };
+    upd();
+    root.querySelector("#medSel").onchange=upd;
+    root.querySelector("#cancel").onclick=close;
+    const delBtn=root.querySelector("#del"); if(delBtn) delBtn.onclick=()=>{ if(confirm("Delete this dose?")){ DB.medDoses=DB.medDoses.filter(x=>x.id!==existing.id); save(); close(); render(); toast("Deleted"); } };
+    root.querySelector("#ok").onclick=()=>{
+      const rec={
+        id: existing?existing.id:uid(),
+        medId: root.querySelector("#medSel").value,
+        takenAt: new Date(root.querySelector("#medTime").value||Date.now()).toISOString(),
+        dose: val(root,"medDose"),
+        notes: val(root,"medNotes"),
+        createdAt: existing?existing.createdAt:nowISO(),
+      };
+      if(existing){ const i=DB.medDoses.findIndex(x=>x.id===existing.id); DB.medDoses[i]=rec; }
+      else DB.medDoses.push(rec);
+      save(); close(); render(); toast("✓ Dose logged");
+    };
+  });
+}
+
+/* ============================================================
+   BLOOD PRESSURE
+   ============================================================ */
+function openBP(existing=null){
+  const b=existing||{};
+  const inner=`
+    <div class="row">
+      <div><label>Systolic</label><input type="number" inputmode="numeric" id="bpSys" placeholder="120" value="${b.systolic??""}" /></div>
+      <div><label>Diastolic</label><input type="number" inputmode="numeric" id="bpDia" placeholder="80" value="${b.diastolic??""}" /></div>
+      <div><label>Pulse <span class="muted">(opt)</span></label><input type="number" inputmode="numeric" id="bpPul" placeholder="—" value="${b.pulse??""}" /></div>
+    </div>
+    <label>Date / time</label>
+    <input type="datetime-local" id="bpTime" value="${b.takenAt?toLocalInput(new Date(b.takenAt)):nowLocalInput()}" />
+    <label>Notes</label>
+    <textarea id="bpNotes" placeholder="e.g. after resting, arm used…">${esc(b.notes||"")}</textarea>
+    <div class="actions">
+      ${existing?`<button class="btn danger small" id="del">Delete</button>`:""}
+      <button class="btn ghost" id="cancel">Cancel</button>
+      <button class="btn primary" id="ok">${existing?"Save":"Log BP"}</button>
+    </div>`;
+  sheet(existing?"Edit BP":"Log blood pressure", inner, (root,close)=>{
+    root.querySelector("#cancel").onclick=close;
+    const delBtn=root.querySelector("#del"); if(delBtn) delBtn.onclick=()=>{ if(confirm("Delete this reading?")){ DB.bp=DB.bp.filter(x=>x.id!==existing.id); save(); close(); render(); toast("Deleted"); } };
+    root.querySelector("#ok").onclick=()=>{
+      const sys=val(root,"bpSys"), dia=val(root,"bpDia");
+      if(!sys||!dia){ toast("Enter systolic and diastolic"); return; }
+      const rec={ id:existing?existing.id:uid(),
+        systolic:Number(sys), diastolic:Number(dia),
+        pulse: val(root,"bpPul")?Number(val(root,"bpPul")):null,
+        takenAt:new Date(root.querySelector("#bpTime").value||Date.now()).toISOString(),
+        notes:val(root,"bpNotes"), createdAt:existing?existing.createdAt:nowISO() };
+      if(existing){ const i=DB.bp.findIndex(x=>x.id===existing.id); DB.bp[i]=rec; } else DB.bp.push(rec);
+      save(); close(); render(); toast("✓ BP logged");
+    };
+  });
+}
+
+/* ============================================================
+   SLEEP
+   ============================================================ */
+function openSleep(existing=null){
+  const s=existing||{};
+  const q=s.quality??null;
+  const inner=`
+    <div class="row">
+      <div><label>Hours slept</label><input type="number" step="0.25" inputmode="decimal" id="slHours" placeholder="7.5" value="${s.hours??""}" /></div>
+    </div>
+    <label>Quality</label>
+    <div class="seg" id="slQ">
+      ${["1","2","3","4","5"].map(n=>`<button type="button" data-v="${n}" class="${q===Number(n)?"on":""}">${n}</button>`).join("")}
+    </div>
+    <p class="sub" style="margin:6px 2px 0">1 = terrible · 5 = great</p>
+    <label>Night of / date</label>
+    <input type="datetime-local" id="slTime" value="${s.timestamp?toLocalInput(new Date(s.timestamp)):nowLocalInput()}" />
+    <label>Notes</label>
+    <textarea id="slNotes" placeholder="woke often, pain, dreams…">${esc(s.notes||"")}</textarea>
+    <div class="actions">
+      ${existing?`<button class="btn danger small" id="del">Delete</button>`:""}
+      <button class="btn ghost" id="cancel">Cancel</button>
+      <button class="btn primary" id="ok">${existing?"Save":"Log sleep"}</button>
+    </div>`;
+  sheet(existing?"Edit sleep":"Log sleep", inner, (root,close)=>{
+    let quality=q;
+    root.querySelectorAll("#slQ button").forEach(b=>b.onclick=()=>{ quality=Number(b.dataset.v); root.querySelectorAll("#slQ button").forEach(x=>x.classList.toggle("on",x===b)); });
+    root.querySelector("#cancel").onclick=close;
+    const delBtn=root.querySelector("#del"); if(delBtn) delBtn.onclick=()=>{ if(confirm("Delete this sleep entry?")){ DB.sleep=DB.sleep.filter(x=>x.id!==existing.id); save(); close(); render(); toast("Deleted"); } };
+    root.querySelector("#ok").onclick=()=>{
+      const hours=val(root,"slHours"); if(!hours){ toast("Enter hours slept"); return; }
+      const rec={ id:existing?existing.id:uid(), hours:Number(hours), quality,
+        timestamp:new Date(root.querySelector("#slTime").value||Date.now()).toISOString(),
+        notes:val(root,"slNotes"), createdAt:existing?existing.createdAt:nowISO() };
+      if(existing){ const i=DB.sleep.findIndex(x=>x.id===existing.id); DB.sleep[i]=rec; } else DB.sleep.push(rec);
+      save(); close(); render(); toast("✓ Sleep logged");
+    };
+  });
+}
+
+/* ============================================================
+   MOOD
+   ============================================================ */
+function openMood(existing=null, prefillRating=null){
+  const m=existing||{};
+  const rating = m.rating ?? prefillRating ?? null;
+  const energy = m.energy ?? null;
+  const tags = new Set(m.tags||[]);
+  const inner=`
+    <label>How do you feel?</label>
+    <div class="faces" id="mdFaces">
+      ${MOOD_FACES.map(f=>`<button type="button" class="face ${rating===f.v?"on":""}" data-v="${f.v}"><span>${f.e}</span><span class="fl">${f.l}</span></button>`).join("")}
+    </div>
+    <label>What's it like? <span class="muted">(tap any that fit)</span></label>
+    <div class="chips" id="mdTags">
+      ${DB.commonMoods.map(t=>`<button type="button" class="chip ${tags.has(t)?"":""}" data-t="${esc(t)}" aria-pressed="${tags.has(t)}">${esc(t)}</button>`).join("")}
+    </div>
+    <label>Energy level <span class="muted">(optional)</span></label>
+    <div class="seg" id="mdEnergy">
+      ${["1","2","3","4","5"].map(n=>`<button type="button" data-v="${n}" class="${energy===Number(n)?"on":""}">${n}</button>`).join("")}
+    </div>
+    <p class="sub" style="margin:6px 2px 0">1 = drained · 5 = energized</p>
+    <label>Time</label>
+    <input type="datetime-local" id="mdTime" value="${m.timestamp?toLocalInput(new Date(m.timestamp)):nowLocalInput()}" />
+    <label>Notes</label>
+    <textarea id="mdNotes" placeholder="what's going on, triggers, context…">${esc(m.notes||"")}</textarea>
+    <div class="actions">
+      ${existing?`<button class="btn danger small" id="del">Delete</button>`:""}
+      <button class="btn ghost" id="cancel">Cancel</button>
+      <button class="btn primary" id="ok">${existing?"Save":"Log mood"}</button>
+    </div>`;
+  sheet(existing?"Edit mood":"Log mood", inner, (root,close)=>{
+    let curRating=rating, curEnergy=energy;
+    root.querySelectorAll("#mdFaces .face").forEach(b=>b.onclick=()=>{ curRating=Number(b.dataset.v); root.querySelectorAll("#mdFaces .face").forEach(x=>x.classList.toggle("on",x===b)); });
+    root.querySelectorAll("#mdEnergy button").forEach(b=>b.onclick=()=>{
+      const v=Number(b.dataset.v);
+      if(curEnergy===v){ curEnergy=null; b.classList.remove("on"); }
+      else{ curEnergy=v; root.querySelectorAll("#mdEnergy button").forEach(x=>x.classList.toggle("on",x===b)); }
+    });
+    root.querySelectorAll("#mdTags .chip").forEach(b=>b.onclick=()=>{
+      const t=b.dataset.t; if(tags.has(t)){ tags.delete(t); b.classList.remove("chosen"); b.style.background=""; b.setAttribute("aria-pressed","false"); }
+      else{ tags.add(t); b.classList.add("chosen"); b.style.background="var(--accent-soft)"; b.setAttribute("aria-pressed","true"); }
+    });
+    // reflect pre-selected tags visually on mount
+    root.querySelectorAll("#mdTags .chip").forEach(b=>{ if(tags.has(b.dataset.t)) b.style.background="var(--accent-soft)"; });
+    root.querySelector("#cancel").onclick=close;
+    const delBtn=root.querySelector("#del"); if(delBtn) delBtn.onclick=()=>{ if(confirm("Delete this mood entry?")){ DB.moods=DB.moods.filter(x=>x.id!==existing.id); save(); close(); render(); toast("Deleted"); } };
+    root.querySelector("#ok").onclick=()=>{
+      if(curRating==null){ toast("Tap how you feel"); return; }
+      const rec={ id:existing?existing.id:uid(), rating:curRating, energy:curEnergy, tags:[...tags],
+        timestamp:new Date(root.querySelector("#mdTime").value||Date.now()).toISOString(),
+        notes:val(root,"mdNotes"), createdAt:existing?existing.createdAt:nowISO(), updatedAt:nowISO() };
+      if(existing){ const i=DB.moods.findIndex(x=>x.id===existing.id); DB.moods[i]=rec; } else DB.moods.push(rec);
+      save(); close(); render(); toast("✓ Mood logged");
+    };
+  });
+}
+
+/* ============================================================
+   SOUL TIME  (restorative activity — not exercise metrics)
+   ============================================================ */
+function openSoul(existing=null, prefillActivity=""){
+  const s=existing||{};
+  const rating = s.rating ?? null;
+  const inner=`
+    <label>What nourished you?</label>
+    <div class="chips" id="soChips">
+      ${DB.commonSoul.map(n=>`<button type="button" class="chip" data-n="${esc(n)}">${esc(n)}</button>`).join("")}
+    </div>
+    <input id="soAct" placeholder="e.g. Journaling" value="${esc(s.activity||prefillActivity)}" />
+    <div class="row">
+      <div><label>Time</label><input type="datetime-local" id="soTime" value="${s.timestamp?toLocalInput(new Date(s.timestamp)):nowLocalInput()}" /></div>
+      <div><label>Duration (min)</label><input type="number" inputmode="numeric" id="soDur" placeholder="optional" value="${s.durationMinutes??""}" /></div>
+    </div>
+    <label>How restoring did it feel? <span class="muted">(optional)</span></label>
+    <div class="seg" id="soRate">
+      ${["1","2","3","4","5"].map(n=>`<button type="button" data-v="${n}" class="${rating===Number(n)?"on":""}">${n}</button>`).join("")}
+    </div>
+    <p class="sub" style="margin:6px 2px 0">1 = didn't land · 5 = deeply restoring</p>
+    <label>Notes</label>
+    <textarea id="soNotes" placeholder="how it went, how you felt after…">${esc(s.notes||"")}</textarea>
+    <div class="actions">
+      ${existing?`<button class="btn danger small" id="del">Delete</button>`:""}
+      <button class="btn ghost" id="cancel">Cancel</button>
+      <button class="btn primary" id="ok">${existing?"Save":"Log soul time"}</button>
+    </div>`;
+  sheet(existing?"Edit soul time":"Log soul time", inner, (root,close)=>{
+    let curRate=rating;
+    root.querySelectorAll("#soChips .chip").forEach(b=>b.onclick=()=>{ root.querySelector("#soAct").value=b.dataset.n; });
+    root.querySelectorAll("#soRate button").forEach(b=>b.onclick=()=>{
+      const v=Number(b.dataset.v);
+      if(curRate===v){ curRate=null; b.classList.remove("on"); }
+      else{ curRate=v; root.querySelectorAll("#soRate button").forEach(x=>x.classList.toggle("on",x===b)); }
+    });
+    root.querySelector("#cancel").onclick=close;
+    const delBtn=root.querySelector("#del"); if(delBtn) delBtn.onclick=()=>{ if(confirm("Delete this soul-time entry?")){ DB.soul=DB.soul.filter(x=>x.id!==existing.id); save(); close(); render(); toast("Deleted"); } };
+    root.querySelector("#ok").onclick=()=>{
+      const activity=val(root,"soAct"); if(!activity){ toast("What did you do?"); return; }
+      const rec={ id:existing?existing.id:uid(), activity,
+        timestamp:new Date(root.querySelector("#soTime").value||Date.now()).toISOString(),
+        durationMinutes: val(root,"soDur")||null, rating:curRate,
+        notes:val(root,"soNotes"), createdAt:existing?existing.createdAt:nowISO(), updatedAt:nowISO() };
+      if(existing){ const i=DB.soul.findIndex(x=>x.id===existing.id); DB.soul[i]=rec; } else DB.soul.push(rec);
+      if(!DB.commonSoul.some(c=>c.toLowerCase()===activity.toLowerCase())) DB.commonSoul.push(activity);
+      save(); close(); render(); toast("🌿 Soul time logged");
+    };
+  });
+}
+
+/* ============================================================
+   WEIGHT  (ad-hoc weigh-ins)
+   ============================================================ */
+function openWeight(existing=null){
+  const w=existing||{};
+  const unit=w.unit||DB.weightUnit||"lb";
+  const inner=`
+    <div class="row">
+      <div style="flex:2"><label>Weight</label><input type="number" step="0.1" inputmode="decimal" id="wtVal" placeholder="e.g. 163" value="${w.weight??""}" /></div>
+      <div style="flex:1"><label>Unit</label>
+        <div class="seg" id="wtUnit">
+          ${["lb","kg"].map(u=>`<button type="button" data-v="${u}" class="${unit===u?"on":""}">${u}</button>`).join("")}
+        </div>
+      </div>
+    </div>
+    <label>Date / time</label>
+    <input type="datetime-local" id="wtTime" value="${w.timestamp?toLocalInput(new Date(w.timestamp)):nowLocalInput()}" />
+    <label>Notes</label>
+    <textarea id="wtNotes" placeholder="e.g. morning, after coffee…">${esc(w.notes||"")}</textarea>
+    <div class="actions">
+      ${existing?`<button class="btn danger small" id="del">Delete</button>`:""}
+      <button class="btn ghost" id="cancel">Cancel</button>
+      <button class="btn primary" id="ok">${existing?"Save":"Log weight"}</button>
+    </div>`;
+  sheet(existing?"Edit weight":"Log weight", inner, (root,close)=>{
+    let unitSel=unit;
+    root.querySelectorAll("#wtUnit button").forEach(b=>b.onclick=()=>{ unitSel=b.dataset.v; root.querySelectorAll("#wtUnit button").forEach(x=>x.classList.toggle("on",x===b)); });
+    root.querySelector("#cancel").onclick=close;
+    const delBtn=root.querySelector("#del"); if(delBtn) delBtn.onclick=()=>{ if(confirm("Delete this weigh-in?")){ DB.weights=DB.weights.filter(x=>x.id!==existing.id); save(); close(); render(); toast("Deleted"); } };
+    root.querySelector("#ok").onclick=()=>{
+      const val0=val(root,"wtVal"); if(!val0){ toast("Enter a weight"); return; }
+      DB.weightUnit=unitSel; // remember last-used unit
+      const rec={ id:existing?existing.id:uid(), weight:Number(val0), unit:unitSel,
+        timestamp:new Date(root.querySelector("#wtTime").value||Date.now()).toISOString(),
+        notes:val(root,"wtNotes"), createdAt:existing?existing.createdAt:nowISO(), updatedAt:nowISO() };
+      if(existing){ const i=DB.weights.findIndex(x=>x.id===existing.id); DB.weights[i]=rec; } else DB.weights.push(rec);
+      save(); close(); render(); toast("✓ Weight logged");
+    };
+  });
+}
+
+/* ============================================================
+   MEAL CONTEXT  (context, not calories)
+   ============================================================ */
+function openMeal(existing=null){
+  const m=existing||{};
+  const drink=m.drink||{had:false};
+  const after=m.after? structuredClone(m.after) : [];
+  const seg=(id,opts,cur)=>`<div class="seg" id="${id}">${opts.map(o=>`<button type="button" data-v="${o}" class="${cur===o?"on":""}">${o}</button>`).join("")}</div>`;
+  const inner=`
+    <label>Time eaten</label>
+    <input type="datetime-local" id="mlTime" value="${m.timeEaten?toLocalInput(new Date(m.timeEaten)):nowLocalInput()}" />
+    <label>What / brief description</label>
+    <input id="mlDesc" placeholder="e.g. leftover pasta" value="${esc(m.description||"")}" />
+    <div class="row">
+      <div><label>Location</label><input id="mlLoc" placeholder="e.g. patio" value="${esc(m.location||"")}" /></div>
+    </div>
+    <label>Source</label>${seg("mlSrc",MEAL_SOURCES,m.source)}
+    <label>Rough size</label>${seg("mlSize",MEAL_SIZES,m.size)}
+    <div class="row">
+      <div><label>Mood at the time</label><input id="mlMood" placeholder="e.g. rushed, calm" value="${esc(m.mood||"")}" /></div>
+    </div>
+    <label>Environment / emotional situation</label>
+    <textarea id="mlSit" placeholder="e.g. eating alone, stressed about work">${esc(m.situation||"")}</textarea>
+
+    <fieldset>
+      <legend>Drink before / after</legend>
+      <div class="seg" id="mlHad" style="margin-top:6px">
+        <button type="button" data-v="no" class="${drink.had?"":"on"}">No drink</button>
+        <button type="button" data-v="yes" class="${drink.had?"on":""}">Yes</button>
+      </div>
+      <div id="drinkFields" class="${drink.had?"":"hidden"}">
+        <label>What did you drink?</label>
+        <input id="mlWhat" placeholder="e.g. iced coffee" value="${esc(drink.what||"")}" />
+        <label>Before or after eating?</label>
+        <div class="seg" id="mlTiming">
+          ${["Before","After","Both"].map(o=>`<button type="button" data-v="${o}" class="${drink.timing===o?"on":""}">${o}</button>`).join("")}
+        </div>
+        <label>How long before eating? (min)</label>
+        <input type="number" inputmode="numeric" id="mlMinsBefore" placeholder="optional" value="${drink.minutesBefore??""}" />
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Symptoms noticed afterward</legend>
+      <div id="afterList">${after.map((a,i)=>afterRow(a,i)).join("")}</div>
+      <button type="button" class="btn ghost small" id="addAfter" style="margin-top:10px">+ Add symptom after</button>
+      <p class="sub" style="margin:8px 2px 0">These also get saved as symptom entries so they show up in correlations.</p>
+    </fieldset>
+
+    <label>Other notes</label>
+    <textarea id="mlNotes" placeholder="anything else">${esc(m.notes||"")}</textarea>
+    <div class="actions">
+      ${existing?`<button class="btn danger small" id="del">Delete</button>`:""}
+      <button class="btn ghost" id="cancel">Cancel</button>
+      <button class="btn primary" id="ok">${existing?"Save":"Log meal context"}</button>
+    </div>`;
+  sheet(existing?"Edit meal context":"Log meal context", inner, (root,close)=>{
+    const state={src:m.source||null,size:m.size||null,timing:drink.timing||null,had:!!drink.had};
+    const wire=(id,key)=>root.querySelectorAll("#"+id+" button").forEach(b=>b.onclick=()=>{
+      state[key]=b.dataset.v; root.querySelectorAll("#"+id+" button").forEach(x=>x.classList.toggle("on",x===b));
+    });
+    wire("mlSrc","src"); wire("mlSize","size"); wire("mlTiming","timing");
+    root.querySelectorAll("#mlHad button").forEach(b=>b.onclick=()=>{
+      state.had=b.dataset.v==="yes";
+      root.querySelectorAll("#mlHad button").forEach(x=>x.classList.toggle("on",x===b));
+      root.querySelector("#drinkFields").classList.toggle("hidden",!state.had);
+    });
+    const listEl=root.querySelector("#afterList");
+    root.querySelector("#addAfter").onclick=()=>{
+      const i=listEl.children.length;
+      const div=document.createElement("div"); div.innerHTML=afterRow({},i); listEl.appendChild(div.firstElementChild);
+      wireAfterRemoval(listEl);
+    };
+    wireAfterRemoval(listEl);
+    root.querySelector("#cancel").onclick=close;
+    const delBtn=root.querySelector("#del"); if(delBtn) delBtn.onclick=()=>{ if(confirm("Delete this meal entry? (Linked after-symptoms stay unless you delete them.)")){ DB.meals=DB.meals.filter(x=>x.id!==existing.id); save(); close(); render(); toast("Deleted"); } };
+    root.querySelector("#ok").onclick=()=>{
+      const afterArr=[...listEl.querySelectorAll(".afterRow")].map(r=>({
+        name:r.querySelector(".afName").value.trim(),
+        durationMinutes:r.querySelector(".afDur").value.trim()||null,
+      })).filter(a=>a.name);
+      const timeEaten=new Date(root.querySelector("#mlTime").value||Date.now()).toISOString();
+      const rec={
+        id:existing?existing.id:uid(),
+        timeEaten,
+        description:val(root,"mlDesc"),
+        location:val(root,"mlLoc"),
+        source:state.src, size:state.size,
+        mood:val(root,"mlMood"), situation:val(root,"mlSit"),
+        drink: state.had? {had:true, what:val(root,"mlWhat"), timing:state.timing, minutesBefore:val(root,"mlMinsBefore")||null} : {had:false},
+        after: afterArr,
+        notes:val(root,"mlNotes"),
+        createdAt:existing?existing.createdAt:nowISO(), updatedAt:nowISO(),
+      };
+      // Sync linked symptom entries (tagged with mealId) so correlations work.
+      DB.symptoms = DB.symptoms.filter(s=>s.mealId!==rec.id); // clear old links
+      afterArr.forEach(a=>{
+        DB.symptoms.push({ id:uid(), name:a.name, timestamp:timeEaten, durationMinutes:a.durationMinutes,
+          severity:null, notes:`After meal: ${rec.description||"(meal)"}`, mealId:rec.id, createdAt:nowISO(), updatedAt:nowISO() });
+        if(!DB.commonSymptoms.some(c=>c.toLowerCase()===a.name.toLowerCase())) DB.commonSymptoms.push(a.name);
+      });
+      if(existing){ const i=DB.meals.findIndex(x=>x.id===existing.id); DB.meals[i]=rec; } else DB.meals.push(rec);
+      save(); close(); render(); toast("✓ Meal context logged");
+    };
+  });
+}
+function afterRow(a,i){
+  return `<div class="afterRow row" style="margin-top:10px; align-items:flex-end">
+    <div style="flex:2"><input class="afName" placeholder="symptom" value="${esc(a.name||"")}" /></div>
+    <div style="flex:1"><input class="afDur" type="number" inputmode="numeric" placeholder="min" value="${a.durationMinutes??""}" /></div>
+    <button type="button" class="btn ghost small afDel" style="flex:0 0 auto">✕</button>
+  </div>`;
+}
+function wireAfterRemoval(listEl){
+  listEl.querySelectorAll(".afDel").forEach(b=>b.onclick=()=>b.closest(".afterRow").remove());
+}
+
+/* ============================================================
+   ENTRY rendering + edit dispatch
+   ============================================================ */
+function entryHTML(e){
+  const m=MOD[e.module];
+  return `<div class="entry" onclick="editEvent('${e.module}','${e.id}')">
+    <div class="bar" style="background:${m.color}"></div>
+    <div class="body">
+      <div class="top">
+        <span class="ttl"><span class="tag" style="background:${m.color}">${m.label}</span> ${esc(e.title)}</span>
+        <span class="when">${fmtTime(e.ts)}</span>
+      </div>
+      ${e.detail?`<div class="det">${esc(e.detail)}</div>`:""}
+      ${e.note?`<div class="note">“${esc(e.note)}”</div>`:""}
+    </div>
+  </div>`;
+}
+function editEvent(module,id){
+  if(module==="symptom") return openSymptom(DB.symptoms.find(x=>x.id===id));
+  if(module==="med") return openMed(DB.medDoses.find(x=>x.id===id));
+  if(module==="bp") return openBP(DB.bp.find(x=>x.id===id));
+  if(module==="sleep") return openSleep(DB.sleep.find(x=>x.id===id));
+  if(module==="meal") return openMeal(DB.meals.find(x=>x.id===id));
+  if(module==="mood") return openMood(DB.moods.find(x=>x.id===id));
+  if(module==="soul") return openSoul(DB.soul.find(x=>x.id===id));
+  if(module==="weight") return openWeight(DB.weights.find(x=>x.id===id));
+}
+
+/* ============================================================
+   HISTORY
+   ============================================================ */
+let histFilter=new Set(); // empty = all
+function renderHistory(){
+  let ev=allEvents();
+  const active=histFilter;
+  if(active.size) ev=ev.filter(e=>active.has(e.module));
+  // group by day
+  const groups={};
+  ev.forEach(e=>{ const k=new Date(e.ts).toDateString(); (groups[k]=groups[k]||[]).push(e); });
+  const keys=Object.keys(groups);
+  app().innerHTML=`
+    <h1>History</h1>
+    <p class="sub">${ev.length} entr${ev.length===1?"y":"ies"}${active.size?` · filtered`:""}. Tap any entry to edit.</p>
+    <div class="filterbar">
+      <button class="fchip ${active.size===0?"on":""}" onclick="toggleFilter('')">All</button>
+      ${Object.keys(MOD).map(k=>`<button class="fchip ${active.has(k)?"on":""}" onclick="toggleFilter('${k}')">${MOD[k].ico} ${MOD[k].label}</button>`).join("")}
+    </div>
+    ${keys.length? keys.map(k=>{
+      const dayIso=groups[k][0].ts;
+      return `<div class="daygroup"><div class="dayhdr">${fmtDay(dayIso)}</div>${groups[k].map(entryHTML).join("")}</div>`;
+    }).join("") : `<div class="empty">No entries yet.<br>Head to <b>Log</b> to add your first.</div>`}
+  `;
+}
+function toggleFilter(k){
+  if(k===""){ histFilter.clear(); }
+  else{ histFilter.has(k)?histFilter.delete(k):histFilter.add(k); }
+  renderHistory();
+}
+
+/* ============================================================
+   CORRELATE
+   ============================================================ */
+let corr={days:14, mods:new Set(["symptom","meal","med","mood"])};
+function renderCorrelate(){
+  const since=new Date(); since.setDate(since.getDate()-corr.days); since.setHours(0,0,0,0);
+  let ev=allEvents().filter(e=>new Date(e.ts)>=since && corr.mods.has(e.module));
+  const groups={};
+  ev.forEach(e=>{ const k=new Date(e.ts).toDateString(); (groups[k]=groups[k]||[]).push(e); });
+  const keys=Object.keys(groups); // already newest-first from allEvents order
+  app().innerHTML=`
+    <h1>Correlate</h1>
+    <p class="sub">See chosen modules together on one timeline to spot patterns.</p>
+    <label>Date range</label>
+    <div class="filterbar">
+      ${[7,14,30,90].map(d=>`<button class="fchip ${corr.days===d?"on":""}" onclick="setCorrDays(${d})">${d} days</button>`).join("")}
+    </div>
+    <label>Show</label>
+    <div class="filterbar">
+      ${Object.keys(MOD).map(k=>`<button class="fchip ${corr.mods.has(k)?"on":""}" onclick="toggleCorr('${k}')">${MOD[k].ico} ${MOD[k].label}</button>`).join("")}
+    </div>
+    <p class="sub" style="margin-top:12px">${ev.length} entr${ev.length===1?"y":"ies"} in the last ${corr.days} days.</p>
+    ${keys.length? keys.map(k=>{
+      const items=groups[k].slice().sort((a,b)=>new Date(a.ts)-new Date(b.ts)); // within day, chronological
+      return `<div class="daygroup"><div class="dayhdr">${fmtDay(groups[k][0].ts)}</div>${items.map(entryHTML).join("")}</div>`;
+    }).join("") : `<div class="empty">Nothing in this range.</div>`}
+  `;
+}
+function setCorrDays(d){ corr.days=d; renderCorrelate(); }
+function toggleCorr(k){ corr.mods.has(k)?corr.mods.delete(k):corr.mods.add(k); if(corr.mods.size===0) corr.mods.add(k); renderCorrelate(); }
+
+/* ============================================================
+   TRENDS  (dependency-free inline-SVG charts + pattern cards)
+   ============================================================ */
+let trend={days:30};
+const CW=340,CH=120,PL=26,PR=10,PT=10,PB=16;
+const PX0=PL,PX1=CW-PR,PY0=PT,PY1=CH-PB;
+let TIPREG={}, TIP_N=0;
+function regTip(html){ const id="tp"+(TIP_N++); TIPREG[id]=html; return id; }
+function xAt(i,n){ return n<=1?(PX0+PX1)/2 : PX0+(PX1-PX0)*i/(n-1); }
+function yAt(v,mn,mx){ return PY1-(PY1-PY0)*((v-mn)/((mx-mn)||1)); }
+function round1(x){ return Math.round(x*10)/10; }
+
+function dailyAgg(from,to){
+  const days=[]; let d=new Date(from); d.setHours(0,0,0,0);
+  const end=new Date(to); end.setHours(0,0,0,0);
+  while(d<=end){ days.push(new Date(d)); d.setDate(d.getDate()+1); }
+  const map={}; const K=x=>new Date(x).toDateString();
+  days.forEach(dd=>map[dd.toDateString()]={date:dd,moods:[],energy:[],symCount:0,symSev:[],symNames:[],sleepH:null,sleepQ:null,sys:[],dia:[],pulse:[],soulMin:0,soulCount:0,weights:[]});
+  const wUnit=DB.weightUnit||"lb";
+  const toU=w=>{ const u=w.unit||wUnit; return u===wUnit? Number(w.weight) : (u==="kg"? Number(w.weight)*2.20462 : Number(w.weight)/2.20462); };
+  DB.weights.forEach(w=>{const k=K(w.timestamp); if(map[k]) map[k].weights.push(toU(w));});
+  DB.moods.forEach(m=>{const k=K(m.timestamp); if(map[k]){ if(m.rating!=null)map[k].moods.push(m.rating); if(m.energy!=null)map[k].energy.push(m.energy);} });
+  DB.symptoms.forEach(s=>{const k=K(s.timestamp); if(map[k]){ map[k].symCount++; if(s.severity!=null)map[k].symSev.push(Number(s.severity)); map[k].symNames.push(s.name);} });
+  DB.sleep.forEach(s=>{const k=K(s.timestamp); if(map[k]){ map[k].sleepH=(map[k].sleepH||0)+Number(s.hours||0); if(s.quality!=null)map[k].sleepQ=s.quality;} });
+  DB.bp.forEach(b=>{const k=K(b.takenAt); if(map[k]){ map[k].sys.push(b.systolic); map[k].dia.push(b.diastolic); if(b.pulse!=null)map[k].pulse.push(b.pulse);} });
+  DB.soul.forEach(s=>{const k=K(s.timestamp); if(map[k]){ map[k].soulMin+=Number(s.durationMinutes||0); map[k].soulCount++;} });
+  return days.map(dd=>map[dd.toDateString()]);
+}
+function fmtMD(d){ return new Date(d).toLocaleDateString(undefined,{month:"numeric",day:"numeric"}); }
+function xAxisLabels(days){
+  const n=days.length; if(!n) return "";
+  const idxs = n<=1?[0] : n<=3?days.map((_,i)=>i) : [0,Math.floor((n-1)/2),n-1];
+  return idxs.map(i=>`<text class="albl" x="${xAt(i,n).toFixed(1)}" y="${CH-4}" text-anchor="${i===0?"start":i===n-1?"end":"middle"}">${fmtMD(days[i].date)}</text>`).join("");
+}
+function gridY(mn,mx,fmt){
+  const ticks=[mn,(mn+mx)/2,mx];
+  return ticks.map(t=>{ const y=yAt(t,mn,mx);
+    return `<line class="grid" x1="${PX0}" y1="${y.toFixed(1)}" x2="${PX1}" y2="${y.toFixed(1)}"/><text class="albl" x="${PX0-4}" y="${(y+3).toFixed(1)}" text-anchor="end">${fmt(t)}</text>`;
+  }).join("");
+}
+
+// LINE chart: series=[{label,color,dash,vals:[num|null]}], domain [mn,mx]
+function lineChart(days,series,mn,mx,fmtY,unit){
+  const n=days.length;
+  const grid=gridY(mn,mx,fmtY);
+  let paths="",dots="";
+  series.forEach(s=>{
+    let dpath="",pen=false;
+    s.vals.forEach((v,i)=>{ if(v==null){pen=false;return;} const x=xAt(i,n),y=yAt(v,mn,mx); dpath+=(pen?"L":"M")+x.toFixed(1)+" "+y.toFixed(1)+" "; pen=true;
+      dots+=`<circle class="dot" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.6" fill="${s.color}"/>`; });
+    paths+=`<path class="line" d="${dpath.trim()}" stroke="${s.color}" ${s.dash?'stroke-dasharray="4 3"':""}/>`;
+  });
+  // hover bands (one per day that has any value)
+  let hits="";
+  const bw=(PX1-PX0)/Math.max(n,1);
+  days.forEach((d,i)=>{
+    const has=series.some(s=>s.vals[i]!=null); if(!has) return;
+    const cx=xAt(i,n);
+    const rows=series.map(s=>s.vals[i]!=null?`<b style="color:${s.color}">■</b> ${s.label}: <b>${round1(s.vals[i])}${unit||""}</b>`:"").filter(Boolean).join("<br>");
+    const id=regTip(`<b>${fmtDayShort(d.date)}</b><br>${rows}`);
+    hits+=`<rect class="hit" data-tip="${id}" data-cx="${cx.toFixed(1)}" x="${(cx-bw/2).toFixed(1)}" y="${PY0}" width="${bw.toFixed(1)}" height="${PY1-PY0}"/>`;
+  });
+  return svgWrap(grid,paths+dots,hits,days);
+}
+// BAR chart: vals:[num], baseline at 0 (or mn), color
+function barChart(days,vals,mn,mx,color,fmtY,tipFn){
+  const n=days.length;
+  const grid=gridY(mn,mx,fmtY);
+  const bw=(PX1-PX0)/Math.max(n,1);
+  let bars="",hits="";
+  const y0=yAt(Math.max(mn,0),mn,mx);
+  days.forEach((d,i)=>{
+    const v=vals[i]; const cx=xAt(i,n);
+    if(v!=null && v>mn){ const y=yAt(v,mn,mx); const w=Math.max(2,bw*0.6);
+      bars+=`<rect class="bar" x="${(cx-w/2).toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(0,y0-y).toFixed(1)}" rx="2" fill="${color}"/>`; }
+    const id=regTip(tipFn(d,v));
+    hits+=`<rect class="hit" data-tip="${id}" data-cx="${cx.toFixed(1)}" x="${(cx-bw/2).toFixed(1)}" y="${PY0}" width="${bw.toFixed(1)}" height="${PY1-PY0}"/>`;
+  });
+  return svgWrap(grid,bars,hits,days);
+}
+function svgWrap(grid,marks,hits,days){
+  return `<svg class="chart js-chart" viewBox="0 0 ${CW} ${CH}" role="img">
+    <line class="axis" x1="${PX0}" y1="${PY1}" x2="${PX1}" y2="${PY1}"/>
+    ${grid}
+    <line class="cross" x1="0" y1="${PY0}" x2="0" y2="${PY1}" stroke="var(--axis)" stroke-width="1" stroke-dasharray="3 3" style="display:none"/>
+    ${marks}
+    ${xAxisLabels(days)}
+    ${hits}
+  </svg>`;
+}
+function legend(items){ return `<div class="legend">${items.map(it=>`<span><i style="border-top-color:${it.color}${it.dash?"; border-top-style:dashed":""}"></i>${esc(it.label)}</span>`).join("")}</div>`; }
+
+function niceTop(v,min){ v=Math.max(v,min); const step=v<=5?1:v<=10?2:v<=30?5:v<=60?10:v<=180?30:60; return Math.ceil(v/step)*step||step; }
+
+function renderTrends(){
+  TIPREG={}; TIP_N=0;
+  const to=new Date(); const from=new Date(); from.setDate(from.getDate()-(trend.days-1)); from.setHours(0,0,0,0);
+  const days=dailyAgg(from,to);
+  const any = DB.moods.length||DB.symptoms.length||DB.sleep.length||DB.bp.length||DB.soul.length||DB.weights.length;
+
+  // series
+  const moodV=days.map(d=>avg(d.moods)), enV=days.map(d=>avg(d.energy));
+  const symC=days.map(d=>d.symCount||0), maxSym=Math.max(1,...symC);
+  const sleepV=days.map(d=>d.sleepH), maxSleep=niceTop(Math.max(8,...sleepV.filter(x=>x!=null).map(x=>Math.ceil(x))),8);
+  const sysV=days.map(d=>d.sys.length?avg(d.sys):null), diaV=days.map(d=>d.dia.length?avg(d.dia):null);
+  const bpAll=[...days.flatMap(d=>d.sys),...days.flatMap(d=>d.dia)];
+  const bpMin=bpAll.length?Math.max(40,Math.floor((Math.min(...bpAll)-10)/10)*10):50;
+  const bpMax=bpAll.length?Math.ceil((Math.max(...bpAll)+10)/10)*10:160;
+  const soulV=days.map(d=>d.soulMin||0), maxSoul=niceTop(Math.max(30,...soulV),30);
+  const wUnit=DB.weightUnit||"lb";
+  const wV=days.map(d=>d.weights.length?avg(d.weights):null);
+  const wVals=wV.filter(v=>v!=null);
+  const wMin=wVals.length?Math.floor((Math.min(...wVals)-2)):0, wMax=wVals.length?Math.ceil((Math.max(...wVals)+2)):1;
+  const hasWeight=wVals.length>0;
+  const hasMood=moodV.some(v=>v!=null)||enV.some(v=>v!=null);
+  const hasBP=sysV.some(v=>v!=null);
+  const hasSleep=sleepV.some(v=>v!=null);
+  const hasSym=symC.some(v=>v>0);
+  const hasSoul=soulV.some(v=>v>0);
+
+  const rangeSel=`<div class="filterbar">${[7,14,30,90].map(d=>`<button class="fchip ${trend.days===d?"on":""}" onclick="setTrendDays(${d})">${d} days</button>`).join("")}</div>`;
+
+  if(!any){
+    app().innerHTML=`<h1>Trends</h1><p class="sub">Charts of how things move over time.</p>${rangeSel}
+      <div class="empty">No data yet.<br>Log a few days, then patterns show up here.</div>`;
+    return;
+  }
+
+  const card=(title,now,sub,body,leg)=>`<div class="chartcard card">
+    <div class="ct"><h3>${title}</h3>${now?`<span class="now">${now}</span>`:""}</div>
+    ${sub?`<p class="csub">${sub}</p>`:""}${body}${leg||""}</div>`;
+
+  let charts="";
+  if(hasMood){
+    const mAvg=avg(moodV.filter(v=>v!=null)), eAvg=avg(enV.filter(v=>v!=null));
+    charts+=card("Mood &amp; energy",
+      `${mAvg!=null?`${moodFace(Math.round(mAvg))} ${round1(mAvg)}`:"—"} avg`,
+      "Daily average, 1–5.",
+      lineChart(days,[
+        {label:"Mood",color:"var(--s-mood)",dash:false,vals:moodV},
+        {label:"Energy",color:"var(--s-energy)",dash:true,vals:enV},
+      ],1,5,v=>Math.round(v),""),
+      legend([{label:"Mood",color:"var(--s-mood)"},{label:"Energy (dashed)",color:"var(--s-energy)",dash:true}]));
+  }
+  if(hasSym){
+    const total=symC.reduce((a,b)=>a+b,0);
+    charts+=card("Symptom load",`${total} in ${trend.days}d`,"Number of symptom entries per day.",
+      barChart(days,symC,0,niceTop(maxSym,1),"var(--sym)",v=>Math.round(v),
+        (d,v)=>{ const sev=d.symSev.length?`avg severity ${round1(avg(d.symSev))}/10`:"no severity noted";
+          const names=d.symNames.length?[...new Set(d.symNames)].slice(0,4).join(", "):"none";
+          return `<b>${fmtDayShort(d.date)}</b><br>${v||0} symptom${v===1?"":"s"} · ${sev}<br><span style="opacity:.85">${esc(names)}</span>`; }));
+  }
+  if(hasSleep){
+    charts+=card("Sleep",`${(()=>{const a=avg(sleepV.filter(v=>v!=null));return a!=null?round1(a)+" h avg":"—";})()}`,"Hours per night.",
+      barChart(days,sleepV,0,maxSleep,"var(--sleep)",v=>Math.round(v),
+        (d,v)=>`<b>${fmtDayShort(d.date)}</b><br>${v!=null?round1(v)+" h":"no entry"}${d.sleepQ?` · quality ${d.sleepQ}/5`:""}`));
+  }
+  if(hasBP){
+    const lastSys=[...days].reverse().find(d=>d.sys.length), lastDia=lastSys;
+    charts+=card("Blood pressure",lastSys?`last ${Math.round(avg(lastSys.sys))}/${Math.round(avg(lastDia.dia))}`:"",
+      "mmHg. Solid = systolic, dashed = diastolic.",
+      lineChart(days,[
+        {label:"Systolic",color:"var(--bp)",dash:false,vals:sysV},
+        {label:"Diastolic",color:"var(--bp)",dash:true,vals:diaV},
+      ],bpMin,bpMax,v=>Math.round(v),""),
+      legend([{label:"Systolic",color:"var(--bp)"},{label:"Diastolic (dashed)",color:"var(--bp)",dash:true}]));
+  }
+  if(hasSoul){
+    const total=soulV.reduce((a,b)=>a+b,0);
+    charts+=card("Soul time",`${durHuman(total)||"0 min"} total`,"Minutes of restorative time per day.",
+      barChart(days,soulV,0,maxSoul,"var(--soul)",v=>Math.round(v),
+        (d,v)=>`<b>${fmtDayShort(d.date)}</b><br>${v?durHuman(v):"none"}${d.soulCount?` · ${d.soulCount} session${d.soulCount===1?"":"s"}`:""}`));
+  }
+
+  if(hasWeight){
+    const last=[...days].reverse().find(d=>d.weights.length);
+    charts+=card("Weight",last?`${round1(avg(last.weights))} ${wUnit}`:"",`In ${wUnit}. Latest weigh-ins.`,
+      lineChart(days,[{label:"Weight",color:"var(--weight)",dash:false,vals:wV}],wMin,wMax,v=>Math.round(v)," "+wUnit),
+      "");
+  }
+
+  app().innerHTML=`<h1>Trends</h1><p class="sub">How things move over the last ${trend.days} days. Tap or hover a point for detail.</p>
+    ${rangeSel}
+    ${charts||`<div class="empty">Nothing in this range yet.</div>`}
+    ${patternCards(days)}`;
+  wireCharts();
+}
+function setTrendDays(d){ trend.days=d; renderTrends(); }
+
+/* Early-signal pattern cards: bucket days and compare. Association, not proof. */
+function patternCards(days){
+  // Only compare days you actually tracked — untracked days aren't "zero", they're unknown.
+  const active=days.filter(d=>d.moods.length||d.energy.length||d.symCount||d.sleepH!=null||d.sys.length||d.soulCount);
+  const withSoul=active.filter(d=>d.soulCount>0), noSoul=active.filter(d=>d.soulCount===0);
+  const cards=[];
+  // Mood on soul-time days vs not
+  cards.push(cmpCard("Mood on soul-time days",
+    "Soul time", avg(withSoul.flatMap(d=>d.moods)), withSoul.filter(d=>d.moods.length).length,
+    "No soul time", avg(noSoul.flatMap(d=>d.moods)), noSoul.filter(d=>d.moods.length).length,
+    "/5", true));
+  // Symptoms on soul-time days vs not
+  cards.push(cmpCard("Symptoms on soul-time days",
+    "Soul time", avg(withSoul.map(d=>d.symCount)), withSoul.length,
+    "No soul time", avg(noSoul.map(d=>d.symCount)), noSoul.length,
+    "/day", false));
+  // Mood by sleep quantity
+  const goodSleep=active.filter(d=>d.sleepH!=null&&d.sleepH>=7), shortSleep=active.filter(d=>d.sleepH!=null&&d.sleepH<6);
+  cards.push(cmpCard("Mood by sleep",
+    "Slept ≥7h", avg(goodSleep.flatMap(d=>d.moods)), goodSleep.filter(d=>d.moods.length).length,
+    "Slept <6h", avg(shortSleep.flatMap(d=>d.moods)), shortSleep.filter(d=>d.moods.length).length,
+    "/5", true));
+  const shown=cards.filter(Boolean);
+  if(!shown.length) return "";
+  return `<h2>Early signals</h2><p class="disclaim">These compare your own days side by side — associations to explore with your doctor, not proof of cause. Small samples wobble.</p>${shown.join("")}`;
+}
+function cmpCard(title,lblA,a,nA,lblB,b,nB,unit,higherBetter){
+  if(a==null||b==null||nA<2||nB<2) return ""; // need enough on both sides
+  const diff=a-b; const dir=Math.abs(diff)<0.05?"flat":diff>0?"up":"down";
+  const good = higherBetter? diff>0 : diff<0;
+  const cls = dir==="flat"?"flat":good?"up":"down";
+  const arrow = dir==="flat"?"≈":diff>0?"▲":"▼";
+  return `<div class="insight card">
+    <p class="ih">${title}</p>
+    <div class="cmp">
+      <div class="side"><div class="lb">${esc(lblA)}</div><div class="vv">${round1(a)}${unit}</div><div class="n">${nA} day${nA===1?"":"s"}</div></div>
+      <div class="delta ${cls}">${arrow} ${round1(Math.abs(diff))}${unit}</div>
+      <div class="side"><div class="lb">${esc(lblB)}</div><div class="vv">${round1(b)}${unit}</div><div class="n">${nB} day${nB===1?"":"s"}</div></div>
+    </div>
+  </div>`;
+}
+
+/* Tooltip + crosshair wiring for charts */
+function wireCharts(){
+  let tip=document.getElementById("charttip");
+  if(!tip){ tip=document.createElement("div"); tip.id="charttip"; tip.className="charttip"; document.body.appendChild(tip); }
+  const move=(e,el)=>{
+    const id=el.getAttribute("data-tip"); const html=TIPREG[id]; if(!html) return;
+    tip.innerHTML=html; tip.classList.add("on");
+    const px=(e.touches?e.touches[0].clientX:e.clientX), py=(e.touches?e.touches[0].clientY:e.clientY);
+    const w=tip.offsetWidth, h=tip.offsetHeight;
+    let x=px+12, y=py-h-12; if(x+w>window.innerWidth-8) x=px-w-12; if(y<8) y=py+16;
+    tip.style.left=x+"px"; tip.style.top=y+"px";
+    const svg=el.closest("svg"); const cross=svg&&svg.querySelector(".cross");
+    if(cross){ const cx=el.getAttribute("data-cx"); cross.setAttribute("x1",cx); cross.setAttribute("x2",cx); cross.style.display=""; }
+  };
+  const hide=(el)=>{ tip.classList.remove("on"); const svg=el.closest("svg"); const cross=svg&&svg.querySelector(".cross"); if(cross) cross.style.display="none"; };
+  app().querySelectorAll(".js-chart .hit").forEach(el=>{
+    el.addEventListener("pointerenter",e=>move(e,el));
+    el.addEventListener("pointermove",e=>move(e,el));
+    el.addEventListener("pointerleave",()=>hide(el));
+    el.addEventListener("touchstart",e=>move(e,el),{passive:true});
+    el.addEventListener("touchmove",e=>move(e,el),{passive:true});
+    el.addEventListener("touchend",()=>hide(el));
+  });
+}
+
+/* ============================================================
+   DOCTOR SUMMARY  (printable)
+   ============================================================ */
+let sumRange={days:30};
+function renderSummary(){
+  const to=new Date();
+  const from=new Date(); from.setDate(from.getDate()-sumRange.days); from.setHours(0,0,0,0);
+  app().innerHTML=`
+    <div class="noprint">
+      <h1>Doctor summary</h1>
+      <p class="sub">Pick a range, then print or save as PDF to bring to your appointment.</p>
+      <div class="filterbar">
+        ${[7,14,30,90,180].map(d=>`<button class="fchip ${sumRange.days===d?"on":""}" onclick="setSumDays(${d})">${d} days</button>`).join("")}
+      </div>
+      <div class="actions" style="margin:8px 0 18px">
+        <button class="btn primary" onclick="window.print()">🖨️ Print / Save PDF</button>
+      </div>
+    </div>
+    <div class="report card" style="padding:18px">${reportHTML(from,to)}</div>
+  `;
+}
+function setSumDays(d){ sumRange.days=d; renderSummary(); }
+
+function inRange(iso,from,to){ const t=new Date(iso); return t>=from && t<=to; }
+function avg(arr){ return arr.length? (arr.reduce((a,b)=>a+b,0)/arr.length) : null; }
+
+function reportHTML(from,to){
+  const fromS=fmtDayShort(from), toS=fmtDayShort(to);
+  const sy = DB.symptoms.filter(s=>inRange(s.timestamp,from,to));
+  const bp = DB.bp.filter(b=>inRange(b.takenAt,from,to)).sort((a,b)=>new Date(a.takenAt)-new Date(b.takenAt));
+  const sl = DB.sleep.filter(s=>inRange(s.timestamp,from,to));
+  const meals = DB.meals.filter(m=>inRange(m.timeEaten,from,to));
+  const moods = DB.moods.filter(m=>inRange(m.timestamp,from,to)).sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
+  const moodAvg = avg(moods.map(m=>m.rating).filter(x=>x!=null));
+  const enAvg = avg(moods.map(m=>m.energy).filter(x=>x!=null));
+  const tagFreq={};
+  moods.forEach(m=>(m.tags||[]).forEach(t=>{ tagFreq[t]=(tagFreq[t]||0)+1; }));
+  const topTags=Object.entries(tagFreq).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([t,n])=>`${t} (${n})`).join(", ");
+  const soul = DB.soul.filter(s=>inRange(s.timestamp,from,to)).sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
+  const soulMin = soul.reduce((a,s)=>a+(Number(s.durationMinutes)||0),0);
+  const soulByAct={};
+  soul.forEach(s=>{ const k=s.activity.trim(); if(!soulByAct[k])soulByAct[k]={n:0,min:0}; soulByAct[k].n++; soulByAct[k].min+=Number(s.durationMinutes)||0; });
+  const soulActSummary=Object.entries(soulByAct).sort((a,b)=>b[1].n-a[1].n).map(([k,v])=>`${k} ×${v.n}${v.min?` (${durHuman(v.min)})`:""}`).join(", ");
+  const wUnit=DB.weightUnit||"lb";
+  const toU=w=>{ const u=w.unit||wUnit; return u===wUnit? Number(w.weight) : (u==="kg"? Number(w.weight)*2.20462 : Number(w.weight)/2.20462); };
+  const weights=DB.weights.filter(w=>inRange(w.timestamp,from,to)).sort((a,b)=>new Date(a.timestamp)-new Date(b.timestamp));
+  const wFirst=weights.length?toU(weights[0]):null, wLast=weights.length?toU(weights[weights.length-1]):null;
+  const wChange=(wFirst!=null&&wLast!=null)?wLast-wFirst:null;
+
+  // symptom frequency
+  const freq={};
+  sy.forEach(s=>{ const k=s.name.trim(); if(!freq[k]) freq[k]={n:0,sev:[],dur:[]}; freq[k].n++; if(s.severity!=null)freq[k].sev.push(s.severity); if(s.durationMinutes)freq[k].dur.push(Number(s.durationMinutes)); });
+  const freqRows=Object.entries(freq).sort((a,b)=>b[1].n-a[1].n).map(([k,v])=>`
+    <tr><td>${esc(k)}</td><td>${v.n}</td><td>${v.sev.length?avg(v.sev).toFixed(1):"—"}</td><td>${v.dur.length?durHuman(Math.round(avg(v.dur))):"—"}</td></tr>`).join("");
+
+  // meds: last taken + intervals
+  const medRows=DB.meds.map(m=>{
+    const ds=DB.medDoses.filter(d=>d.medId===m.id && inRange(d.takenAt,from,to)).sort((a,b)=>new Date(a.takenAt)-new Date(b.takenAt));
+    const allDs=DB.medDoses.filter(d=>d.medId===m.id).sort((a,b)=>new Date(a.takenAt)-new Date(b.takenAt));
+    const last=allDs[allDs.length-1];
+    let ints=[];
+    for(let i=1;i<ds.length;i++){ ints.push((new Date(ds[i].takenAt)-new Date(ds[i-1].takenAt))/86400000); }
+    const meanInt=ints.length? avg(ints):null;
+    return `<tr>
+      <td>${esc(m.name)}</td><td>${esc(m.type)}</td>
+      <td>${ds.length}</td>
+      <td>${last?`${fmtDayShort(last.takenAt)} (${ago(last.takenAt)})`:"—"}</td>
+      <td>${meanInt!=null?`${meanInt.toFixed(1)} d`:"—"}</td>
+    </tr>`;
+  }).join("");
+  const doseDetail=DB.meds.map(m=>{
+    const ds=DB.medDoses.filter(d=>d.medId===m.id && inRange(d.takenAt,from,to)).sort((a,b)=>new Date(a.takenAt)-new Date(b.takenAt));
+    if(!ds.length) return "";
+    return `<tr><td colspan="5"><b>${esc(m.name)}</b>: ${ds.map(d=>`${fmtDateTime(d.takenAt)}${d.dose?` (${esc(d.dose)})`:""}`).join(" · ")}</td></tr>`;
+  }).join("");
+
+  // BP stats
+  const sysAvg=avg(bp.map(b=>b.systolic)), diaAvg=avg(bp.map(b=>b.diastolic));
+  const bpRows=bp.map(b=>`<tr><td>${fmtDateTime(b.takenAt)}</td><td>${b.systolic}/${b.diastolic}</td><td>${b.pulse??"—"}</td><td>${esc(b.notes||"")}</td></tr>`).join("");
+
+  // Sleep stats
+  const slAvg=avg(sl.map(s=>Number(s.hours))), slQ=avg(sl.map(s=>s.quality).filter(x=>x!=null));
+
+  return `
+    <h1>Health summary</h1>
+    <p class="muted">${fromS} – ${toS} · generated ${fmtDayShort(new Date())}</p>
+
+    <div class="statgrid" style="margin:14px 0">
+      <div class="stat card"><div class="k">Symptom entries</div><div class="v">${sy.length}</div></div>
+      <div class="stat card"><div class="k">Med doses</div><div class="v">${DB.medDoses.filter(d=>inRange(d.takenAt,from,to)).length}</div></div>
+      <div class="stat card"><div class="k">Avg BP</div><div class="v">${sysAvg!=null?`${Math.round(sysAvg)}/${Math.round(diaAvg)}`:"—"}</div><div class="s">${bp.length} readings</div></div>
+      <div class="stat card"><div class="k">Avg sleep</div><div class="v">${slAvg!=null?slAvg.toFixed(1)+" h":"—"}</div><div class="s">${slQ!=null?`quality ${slQ.toFixed(1)}/5`:""}</div></div>
+      <div class="stat card"><div class="k">Avg mood</div><div class="v">${moodAvg!=null?`${moodFace(Math.round(moodAvg))} ${moodAvg.toFixed(1)}/5`:"—"}</div><div class="s">${moods.length} check-in${moods.length===1?"":"s"}${enAvg!=null?` · energy ${enAvg.toFixed(1)}/5`:""}</div></div>
+      <div class="stat card"><div class="k">Soul time</div><div class="v">${soul.length}</div><div class="s">${soulMin?`${durHuman(soulMin)} total`:"sessions"}</div></div>
+      <div class="stat card"><div class="k">Weight</div><div class="v">${wLast!=null?`${round1(wLast)} ${wUnit}`:"—"}</div><div class="s">${wChange!=null?`${wChange>=0?"+":""}${round1(wChange)} ${wUnit} over range`:`${weights.length} weigh-ins`}</div></div>
+    </div>
+
+    <table><caption>Symptoms — frequency</caption>
+      <thead><tr><th>Symptom</th><th>Times</th><th>Avg severity</th><th>Avg duration</th></tr></thead>
+      <tbody>${freqRows||`<tr><td colspan="4" class="muted">None in range.</td></tr>`}</tbody>
+    </table>
+
+    <table><caption>Medications — intervals & last taken</caption>
+      <thead><tr><th>Med</th><th>Type</th><th>Doses in range</th><th>Last taken (all-time)</th><th>Avg interval</th></tr></thead>
+      <tbody>${medRows||`<tr><td colspan="5" class="muted">No meds defined.</td></tr>`}${doseDetail}</tbody>
+    </table>
+
+    <table><caption>Blood pressure</caption>
+      <thead><tr><th>When</th><th>Reading</th><th>Pulse</th><th>Notes</th></tr></thead>
+      <tbody>${bpRows||`<tr><td colspan="4" class="muted">None in range.</td></tr>`}</tbody>
+    </table>
+
+    <table><caption>Sleep</caption>
+      <thead><tr><th>Night</th><th>Hours</th><th>Quality</th><th>Notes</th></tr></thead>
+      <tbody>${sl.slice().sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp)).map(s=>`<tr><td>${fmtDayShort(s.timestamp)}</td><td>${s.hours}</td><td>${s.quality??"—"}/5</td><td>${esc(s.notes||"")}</td></tr>`).join("")||`<tr><td colspan="4" class="muted">None in range.</td></tr>`}</tbody>
+    </table>
+
+    <table><caption>Weight${wChange!=null?` — ${wChange>=0?"+":""}${round1(wChange)} ${wUnit} over range`:""}</caption>
+      <thead><tr><th>When</th><th>Weight</th><th>Notes</th></tr></thead>
+      <tbody>${weights.slice().reverse().map(w=>`<tr><td>${fmtDateTime(w.timestamp)}</td><td>${w.weight} ${esc(w.unit||wUnit)}</td><td>${esc(w.notes||"")}</td></tr>`).join("")||`<tr><td colspan="3" class="muted">None in range.</td></tr>`}</tbody>
+    </table>
+
+    <table><caption>Mood${topTags?` — common: ${esc(topTags)}`:""}</caption>
+      <thead><tr><th>When</th><th>Mood</th><th>Energy</th><th>Tags / notes</th></tr></thead>
+      <tbody>${moods.map(m=>`<tr>
+        <td>${fmtDateTime(m.timestamp)}</td>
+        <td>${moodFace(m.rating)} ${moodLabel(m.rating)} (${m.rating}/5)</td>
+        <td>${m.energy?m.energy+"/5":"—"}</td>
+        <td>${esc([ (m.tags&&m.tags.length)?m.tags.join(", "):"", m.notes ].filter(Boolean).join(" — "))||"—"}</td>
+      </tr>`).join("")||`<tr><td colspan="4" class="muted">None in range.</td></tr>`}</tbody>
+    </table>
+
+    <table><caption>Soul time${soulActSummary?` — ${esc(soulActSummary)}`:""}</caption>
+      <thead><tr><th>When</th><th>Activity</th><th>Duration</th><th>Restoring</th><th>Notes</th></tr></thead>
+      <tbody>${soul.map(s=>`<tr>
+        <td>${fmtDateTime(s.timestamp)}</td>
+        <td>${esc(s.activity)}</td>
+        <td>${s.durationMinutes?durHuman(s.durationMinutes):"—"}</td>
+        <td>${s.rating?s.rating+"/5":"—"}</td>
+        <td>${esc(s.notes||"")}</td>
+      </tr>`).join("")||`<tr><td colspan="5" class="muted">None in range.</td></tr>`}</tbody>
+    </table>
+
+    <table><caption>Meal context & symptoms afterward</caption>
+      <thead><tr><th>When</th><th>Meal / context</th><th>Drink</th><th>Symptoms after</th></tr></thead>
+      <tbody>${meals.slice().sort((a,b)=>new Date(b.timeEaten)-new Date(a.timeEaten)).map(m=>`<tr>
+        <td>${fmtDateTime(m.timeEaten)}</td>
+        <td>${esc([m.description,m.source,m.size&&m.size+" size",m.location,m.mood&&"mood: "+m.mood,m.situation].filter(Boolean).join("; "))}</td>
+        <td>${m.drink&&m.drink.had?esc([m.drink.what,m.drink.timing,m.drink.minutesBefore&&m.drink.minutesBefore+"m before"].filter(Boolean).join(", ")):"—"}</td>
+        <td>${m.after&&m.after.length?esc(m.after.map(a=>a.name+(a.durationMinutes?` (${durHuman(a.durationMinutes)})`:"")).join(", ")):"—"}</td>
+      </tr>`).join("")||`<tr><td colspan="4" class="muted">None in range.</td></tr>`}</tbody>
+    </table>
+  `;
+}
+
+/* ============================================================
+   ADD FROM CLAUDE  (merge a scribe-produced block, additively)
+   ============================================================ */
+const INGEST_LABEL={symptoms:"symptoms",medDoses:"med doses",bp:"BP readings",sleep:"sleep",meals:"meals",moods:"moods",soul:"soul time",weights:"weigh-ins"};
+function mergeArray(targetKey, incoming){
+  const target=DB[targetKey]; let added=0;
+  incoming.forEach(item=>{
+    if(!item||typeof item!=="object") return;
+    if(!item.id) item.id=uid();
+    if(!item.createdAt) item.createdAt=nowISO();
+    const i=target.findIndex(x=>x.id===item.id);
+    if(i>=0) target[i]=Object.assign({},target[i],item);
+    else { target.push(item); added++; }
+  });
+  return added;
+}
+function unionCommon(key, incoming){
+  incoming.forEach(v=>{ if(v && !DB[key].some(t=>t.toLowerCase()===String(v).toLowerCase())) DB[key].push(String(v)); });
+}
+function mergeMeds(incoming){
+  incoming.forEach(m=>{ if(!m||!m.name) return;
+    if(DB.meds.some(x=>x.name.toLowerCase()===m.name.toLowerCase())) return;
+    DB.meds.push({id:m.id||uid(), name:m.name, type:m.type||"Other", defaultDose:m.defaultDose||""}); });
+}
+function ingestFromClaude(){
+  const ta=document.getElementById("claudePaste"); if(!ta) return;
+  let raw=ta.value.trim();
+  if(!raw){ toast("Paste the block from Claude first"); return; }
+  raw=raw.replace(/^```[a-z]*\s*/i,"").replace(/```\s*$/,"").trim();  // tolerate code fences
+  let obj;
+  try{ obj=JSON.parse(raw); }catch(e){ toast("⚠️ That doesn't look like a valid block"); return; }
+  const src = (obj.add && typeof obj.add==="object") ? obj.add : obj;
+  let total=0; const parts=[];
+  Object.keys(INGEST_LABEL).forEach(k=>{
+    if(Array.isArray(src[k])){ const n=mergeArray(k, src[k]); if(n){ total+=n; parts.push(`${n} ${INGEST_LABEL[k]}`); } }
+  });
+  ["commonSymptoms","commonMoods","commonSoul"].forEach(k=>{ const inc=obj[k]||src[k]; if(Array.isArray(inc)) unionCommon(k, inc); });
+  const meds=obj.meds||src.meds; if(Array.isArray(meds)) mergeMeds(meds);
+  if(!total){ toast("Nothing new to add (already logged?)"); return; }
+  save(); ta.value="";
+  render(); setTab("history");
+  toast(`✓ Added ${total} entr${total===1?"y":"ies"}`);
+  setTimeout(()=>alert("Filed:\n• "+parts.join("\n• ")),50);
+}
+
+/* ============================================================
+   SETTINGS  (meds, common symptoms, backup, data)
+   ============================================================ */
+function renderSettings(){
+  const showInstall = !isStandalone();
+  app().innerHTML=`
+    <h1>Settings</h1>
+
+    ${showInstall?`<div class="insight card" style="border-color:var(--accent)">
+      <p class="ih">📲 Install on this device</p>
+      <p class="sub" style="margin:0 0 10px">Add Health Log to your home screen so it opens like an app and works offline.</p>
+      ${deferredInstall?`<button class="btn primary small" onclick="installApp()">Install app</button>`
+        :`<p class="sub" style="margin:0">On Android Chrome: menu (⋮) → <b>Install app</b> / <b>Add to Home screen</b>.<br>On iPhone Safari: Share → <b>Add to Home Screen</b>.</p>`}
+    </div>`:""}
+
+    <h2>Add from Claude</h2>
+    <p class="sub">Told Claude about your day? Paste the block it gives you here and it files everything at once — nothing gets overwritten.</p>
+    <textarea id="claudePaste" placeholder='Paste the block from Claude (starts with { … )' style="min-height:110px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px"></textarea>
+    <button class="btn primary" style="margin-top:8px" onclick="ingestFromClaude()">Add these entries</button>
+
+    <h2>Medications</h2>
+    <p class="sub">Your intermittent meds (injections, patches, biologics, eye drops). Daily meds don't belong here.</p>
+    <div>${DB.meds.map(m=>{
+      const last=lastDose(m.id);
+      return `<div class="entry"><div class="bar" style="background:var(--med)"></div><div class="body">
+        <div class="top"><span class="ttl">${esc(m.name)} <span class="muted" style="font-weight:500">· ${esc(m.type)}</span></span>
+        <span class="when">${DB.medDoses.filter(d=>d.medId===m.id).length} doses</span></div>
+        <div class="det">${m.defaultDose?`default ${esc(m.defaultDose)} · `:""}${last?`last ${ago(last.takenAt)}`:"no doses yet"}</div>
+        <div class="inline" style="margin-top:8px">
+          <button class="btn ghost small" onclick="editMedDef('${m.id}')">Edit</button>
+          <button class="btn danger small" onclick="deleteMedDef('${m.id}')">Delete</button>
+        </div>
+      </div></div>`;
+    }).join("")||`<p class="muted">None yet.</p>`}</div>
+    <button class="btn primary" style="margin-top:6px" onclick="editMedDef()">+ Add medication</button>
+
+    <h2>Common symptoms</h2>
+    <p class="sub">Quick-tap chips on the Log screen.</p>
+    <div class="chips">
+      ${DB.commonSymptoms.map((n,i)=>`<button class="chip" onclick="removeCommon(${i})">${esc(n)} <span class="meta">✕</span></button>`).join("")}
+    </div>
+    <div class="row" style="margin-top:8px">
+      <div><input id="newCommon" placeholder="Add a symptom name" /></div>
+      <button class="btn primary small" style="flex:0 0 auto" onclick="addCommon()">Add</button>
+    </div>
+
+    <h2>Mood tags</h2>
+    <p class="sub">Tap-to-choose descriptors on the Mood screen.</p>
+    <div class="chips">
+      ${DB.commonMoods.map((n,i)=>`<button class="chip" onclick="removeMood(${i})">${esc(n)} <span class="meta">✕</span></button>`).join("")}
+    </div>
+    <div class="row" style="margin-top:8px">
+      <div><input id="newMood" placeholder="Add a mood descriptor" /></div>
+      <button class="btn primary small" style="flex:0 0 auto" onclick="addMood()">Add</button>
+    </div>
+
+    <h2>Soul-time activities</h2>
+    <p class="sub">One-tap chips on the Log screen.</p>
+    <div class="chips">
+      ${DB.commonSoul.map((n,i)=>`<button class="chip" onclick="removeSoul(${i})">${esc(n)} <span class="meta">✕</span></button>`).join("")}
+    </div>
+    <div class="row" style="margin-top:8px">
+      <div><input id="newSoul" placeholder="Add an activity" /></div>
+      <button class="btn primary small" style="flex:0 0 auto" onclick="addSoul()">Add</button>
+    </div>
+
+    <h2>Your data</h2>
+    <p class="sub">Everything is stored only in this browser on this device — nothing is sent anywhere. Back up regularly so you don't lose it.</p>
+    <div class="inline">
+      <button class="btn ghost small" onclick="exportJSON()">⬇︎ Backup (JSON)</button>
+      <button class="btn ghost small" onclick="document.getElementById('importFile').click()">⬆︎ Restore</button>
+      <input type="file" id="importFile" accept="application/json" class="hidden" onchange="importJSON(this)">
+    </div>
+    <div class="inline" style="margin-top:10px">
+      <button class="btn danger small" onclick="wipe()">Erase all data</button>
+    </div>
+    <p class="sub" style="margin-top:18px">Health Log · v1 · offline &amp; private</p>
+  `;
+}
+function addCommon(){
+  const el=document.getElementById("newCommon"); const v=el.value.trim();
+  if(!v) return;
+  if(!DB.commonSymptoms.some(c=>c.toLowerCase()===v.toLowerCase())) DB.commonSymptoms.push(v);
+  save(); renderSettings();
+}
+function removeCommon(i){ DB.commonSymptoms.splice(i,1); save(); renderSettings(); }
+function addMood(){
+  const el=document.getElementById("newMood"); const v=el.value.trim();
+  if(!v) return;
+  if(!DB.commonMoods.some(c=>c.toLowerCase()===v.toLowerCase())) DB.commonMoods.push(v);
+  save(); renderSettings();
+}
+function removeMood(i){ DB.commonMoods.splice(i,1); save(); renderSettings(); }
+function addSoul(){
+  const el=document.getElementById("newSoul"); const v=el.value.trim();
+  if(!v) return;
+  if(!DB.commonSoul.some(c=>c.toLowerCase()===v.toLowerCase())) DB.commonSoul.push(v);
+  save(); renderSettings();
+}
+function removeSoul(i){ DB.commonSoul.splice(i,1); save(); renderSettings(); }
+
+function editMedDef(id=null){
+  const m = id? DB.meds.find(x=>x.id===id) : {};
+  const inner=`
+    <label>Name</label>
+    <input id="mdName" placeholder="e.g. Humira" value="${esc(m.name||"")}" />
+    <label>Type</label>
+    <select id="mdType">${MED_TYPES.map(t=>`<option ${m.type===t?"selected":""}>${t}</option>`).join("")}</select>
+    <label>Default dose <span class="muted">(optional)</span></label>
+    <input id="mdDose" placeholder="e.g. 40 mg" value="${esc(m.defaultDose||"")}" />
+    <div class="actions">
+      <button class="btn ghost" id="cancel">Cancel</button>
+      <button class="btn primary" id="ok">${id?"Save":"Add"}</button>
+    </div>`;
+  sheet(id?"Edit medication":"Add medication", inner, (root,close)=>{
+    root.querySelector("#cancel").onclick=close;
+    root.querySelector("#ok").onclick=()=>{
+      const name=val(root,"mdName"); if(!name){ toast("Enter a name"); return; }
+      if(id){ Object.assign(m,{name,type:root.querySelector("#mdType").value,defaultDose:val(root,"mdDose")}); }
+      else DB.meds.push({id:uid(),name,type:root.querySelector("#mdType").value,defaultDose:val(root,"mdDose")});
+      save(); close(); renderSettings(); toast("Saved");
+    };
+  });
+}
+function deleteMedDef(id){
+  const n=DB.medDoses.filter(d=>d.medId===id).length;
+  if(!confirm(`Delete this medication${n?` and its ${n} logged dose${n>1?"s":""}`:""}?`)) return;
+  DB.meds=DB.meds.filter(x=>x.id!==id);
+  DB.medDoses=DB.medDoses.filter(d=>d.medId!==id);
+  save(); renderSettings(); toast("Deleted");
+}
+
+async function exportJSON(){
+  const filename=`health-log-backup-${new Date().toISOString().slice(0,10)}.json`;
+  const data=JSON.stringify(DB,null,2);
+  // Hosted (artifact) path: use the downloads capability if the viewer grants it.
+  try{
+    if(window.claude && typeof window.claude.use==="function"){
+      const dl=await window.claude.use("downloads");
+      if(dl){
+        try{ await dl.save({filename, data}); toast("Backup saved"); }
+        catch(e){ toast(e && e.code==="declined" ? "Backup cancelled" : "⚠️ Couldn't save backup"); }
+        return;
+      }
+    }
+  }catch(e){ /* fall through to standalone download */ }
+  // Standalone (local file) path.
+  const blob=new Blob([data],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download=filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  toast("Backup downloaded");
+}
+function importJSON(input){
+  const f=input.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const d=JSON.parse(r.result);
+      if(!d || typeof d!=="object") throw new Error("bad");
+      if(!confirm("Restore this backup? It replaces all current data in this browser.")) return;
+      DB=Object.assign(structuredClone(DEFAULT_DB), d);
+      save(); render(); toast("Restored");
+    }catch(e){ toast("⚠️ Couldn't read that file"); }
+  };
+  r.readAsText(f);
+  input.value="";
+}
+function wipe(){
+  if(!confirm("Erase ALL health data from this browser? This cannot be undone. Consider a backup first.")) return;
+  if(!confirm("Really erase everything?")) return;
+  DB=structuredClone(DEFAULT_DB); save(); render(); toast("All data erased");
+}
+
+/* ---- PWA: service worker + install prompt ---- */
+let deferredInstall=null;
+window.addEventListener("beforeinstallprompt",e=>{ e.preventDefault(); deferredInstall=e; if(TAB==="settings") renderSettings(); });
+window.addEventListener("appinstalled",()=>{ deferredInstall=null; toast("Installed 🎉"); if(TAB==="settings") renderSettings(); });
+async function installApp(){
+  if(!deferredInstall){ toast("Use your browser menu → “Install app” / “Add to Home screen”"); return; }
+  deferredInstall.prompt(); await deferredInstall.userChoice; deferredInstall=null; if(TAB==="settings") renderSettings();
+}
+function isStandalone(){ return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone===true; }
+if("serviceWorker" in navigator){
+  window.addEventListener("load",()=>{ navigator.serviceWorker.register("./sw.js").catch(()=>{}); });
+}
+
+/* boot */
+render();
+</script>
+</body>
+</html>
