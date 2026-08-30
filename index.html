@@ -1729,6 +1729,11 @@ function ensureTokenClient(){
         if(SYNC._resolve){ const r=SYNC._resolve; SYNC._resolve=SYNC._reject=null; r(accessToken); } }
       else if(SYNC._reject){ const r=SYNC._reject; SYNC._resolve=SYNC._reject=null; r(new Error(resp&&resp.error||"sign-in failed")); }
     },
+    error_callback: (err)=>{
+      if(SYNC._reject){ const r=SYNC._reject; SYNC._resolve=SYNC._reject=null;
+        const t=err&&err.type;
+        r(new Error(t==="popup_closed"?"Sign-in window closed — tap Connect again":(t==="popup_failed_to_open"?"Pop-up was blocked — allow pop-ups, then Connect":(t||"sign-in failed")))); }
+    },
   });
   return tokenClient;
 }
@@ -1737,8 +1742,11 @@ function getToken(interactive){
     if(accessToken && Date.now()<tokenExpiry-60000){ resolve(accessToken); return; }
     const tc=ensureTokenClient();
     if(!tc){ reject(new Error("Google sign-in isn’t ready yet")); return; }
-    SYNC._resolve=resolve; SYNC._reject=reject;
-    try{ tc.requestAccessToken({prompt: interactive?"consent":""}); }catch(e){ SYNC._resolve=SYNC._reject=null; reject(e); }
+    let done=false;
+    const to=setTimeout(()=>{ if(done) return; done=true; SYNC._resolve=SYNC._reject=null; reject(new Error("Sign-in didn’t finish — tap Connect again")); }, 60000);
+    SYNC._resolve=(t)=>{ if(done) return; done=true; clearTimeout(to); resolve(t); };
+    SYNC._reject=(e)=>{ if(done) return; done=true; clearTimeout(to); reject(e); };
+    try{ tc.requestAccessToken({prompt: interactive?"consent":""}); }catch(e){ if(!done){ done=true; clearTimeout(to); SYNC._resolve=SYNC._reject=null; reject(e); } }
   });
 }
 async function driveFetch(url,opts){
