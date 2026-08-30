@@ -8,6 +8,7 @@
 <link rel="apple-touch-icon" href="./icon-192.png" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-title" content="Health Log" />
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <title>Health Log</title>
 <style>
   :root{
@@ -232,6 +233,7 @@ const DEFAULT_DB = {
   commonSymptoms: ["Headache", "Fatigue", "Nausea", "Joint pain", "Dizziness", "Brain fog"],
   commonMoods: ["Calm", "Anxious", "Low", "Irritable", "Content", "Overwhelmed", "Hopeful", "Flat"],
   commonSoul: ["Kingdom tour", "Coffee ritual", "Time with Presence", "Plant tending", "Baking", "Journaling", "Meditation"],
+  _deleted: {},      // { entryId: ISO time of deletion } — tombstones so deletes sync across devices
 };
 const MOOD_FACES = [ {v:1,e:"😞",l:"Awful"}, {v:2,e:"😕",l:"Low"}, {v:3,e:"😐",l:"Okay"}, {v:4,e:"🙂",l:"Good"}, {v:5,e:"😄",l:"Great"} ];
 
@@ -244,7 +246,10 @@ function load(){
   }catch(e){ console.warn("load failed", e); return structuredClone(DEFAULT_DB); }
 }
 let DB = load();
-function save(){ try{ localStorage.setItem(DB_KEY, JSON.stringify(DB)); }catch(e){ toast("⚠️ Could not save — storage full?"); } }
+function save0(){ try{ localStorage.setItem(DB_KEY, JSON.stringify(DB)); }catch(e){ toast("⚠️ Could not save — storage full?"); } }
+function save(){ save0(); scheduleSync(); }
+// Delete an entry AND leave a tombstone, so the deletion propagates through sync.
+function removeById(key,id){ DB[key]=DB[key].filter(x=>x.id!==id); DB._deleted=DB._deleted||{}; DB._deleted[id]=nowISO(); }
 
 /* ---------- helpers ---------- */
 const MED_TYPES = ["Injection","Patch","Biologic","Eye drops","Other"];
@@ -513,7 +518,7 @@ function openSymptom(existing=null, prefillName=""){
     });
     root.querySelectorAll("#symChips .chip").forEach(b=>b.onclick=()=>{ root.querySelector("#symName").value=b.dataset.n; });
     root.querySelector("#cancel").onclick=close;
-    const delBtn=root.querySelector("#del"); if(delBtn) delBtn.onclick=()=>{ if(confirm("Delete this symptom entry?")){ DB.symptoms=DB.symptoms.filter(x=>x.id!==existing.id); save(); close(); render(); toast("Deleted"); } };
+    const delBtn=root.querySelector("#del"); if(delBtn) delBtn.onclick=()=>{ if(confirm("Delete this symptom entry?")){ removeById("symptoms",existing.id); save(); close(); render(); toast("Deleted"); } };
     root.querySelector("#ok").onclick=()=>{
       const name=val(root,"symName"); if(!name){ toast("Add a symptom name"); return; }
       const rec={
@@ -575,7 +580,7 @@ function openMed(existing=null, medId=null){
     upd();
     root.querySelector("#medSel").onchange=upd;
     root.querySelector("#cancel").onclick=close;
-    const delBtn=root.querySelector("#del"); if(delBtn) delBtn.onclick=()=>{ if(confirm("Delete this dose?")){ DB.medDoses=DB.medDoses.filter(x=>x.id!==existing.id); save(); close(); render(); toast("Deleted"); } };
+    const delBtn=root.querySelector("#del"); if(delBtn) delBtn.onclick=()=>{ if(confirm("Delete this dose?")){ removeById("medDoses",existing.id); save(); close(); render(); toast("Deleted"); } };
     root.querySelector("#ok").onclick=()=>{
       const rec={
         id: existing?existing.id:uid(),
@@ -614,7 +619,7 @@ function openBP(existing=null){
     </div>`;
   sheet(existing?"Edit BP":"Log blood pressure", inner, (root,close)=>{
     root.querySelector("#cancel").onclick=close;
-    const delBtn=root.querySelector("#del"); if(delBtn) delBtn.onclick=()=>{ if(confirm("Delete this reading?")){ DB.bp=DB.bp.filter(x=>x.id!==existing.id); save(); close(); render(); toast("Deleted"); } };
+    const delBtn=root.querySelector("#del"); if(delBtn) delBtn.onclick=()=>{ if(confirm("Delete this reading?")){ removeById("bp",existing.id); save(); close(); render(); toast("Deleted"); } };
     root.querySelector("#ok").onclick=()=>{
       const sys=val(root,"bpSys"), dia=val(root,"bpDia");
       if(!sys||!dia){ toast("Enter systolic and diastolic"); return; }
@@ -657,7 +662,7 @@ function openSleep(existing=null){
     let quality=q;
     root.querySelectorAll("#slQ button").forEach(b=>b.onclick=()=>{ quality=Number(b.dataset.v); root.querySelectorAll("#slQ button").forEach(x=>x.classList.toggle("on",x===b)); });
     root.querySelector("#cancel").onclick=close;
-    const delBtn=root.querySelector("#del"); if(delBtn) delBtn.onclick=()=>{ if(confirm("Delete this sleep entry?")){ DB.sleep=DB.sleep.filter(x=>x.id!==existing.id); save(); close(); render(); toast("Deleted"); } };
+    const delBtn=root.querySelector("#del"); if(delBtn) delBtn.onclick=()=>{ if(confirm("Delete this sleep entry?")){ removeById("sleep",existing.id); save(); close(); render(); toast("Deleted"); } };
     root.querySelector("#ok").onclick=()=>{
       const hours=val(root,"slHours"); if(!hours){ toast("Enter hours slept"); return; }
       const rec={ id:existing?existing.id:uid(), hours:Number(hours), quality,
@@ -715,7 +720,7 @@ function openMood(existing=null, prefillRating=null){
     // reflect pre-selected tags visually on mount
     root.querySelectorAll("#mdTags .chip").forEach(b=>{ if(tags.has(b.dataset.t)) b.style.background="var(--accent-soft)"; });
     root.querySelector("#cancel").onclick=close;
-    const delBtn=root.querySelector("#del"); if(delBtn) delBtn.onclick=()=>{ if(confirm("Delete this mood entry?")){ DB.moods=DB.moods.filter(x=>x.id!==existing.id); save(); close(); render(); toast("Deleted"); } };
+    const delBtn=root.querySelector("#del"); if(delBtn) delBtn.onclick=()=>{ if(confirm("Delete this mood entry?")){ removeById("moods",existing.id); save(); close(); render(); toast("Deleted"); } };
     root.querySelector("#ok").onclick=()=>{
       if(curRating==null){ toast("Tap how you feel"); return; }
       const rec={ id:existing?existing.id:uid(), rating:curRating, energy:curEnergy, tags:[...tags],
@@ -764,7 +769,7 @@ function openSoul(existing=null, prefillActivity=""){
       else{ curRate=v; root.querySelectorAll("#soRate button").forEach(x=>x.classList.toggle("on",x===b)); }
     });
     root.querySelector("#cancel").onclick=close;
-    const delBtn=root.querySelector("#del"); if(delBtn) delBtn.onclick=()=>{ if(confirm("Delete this soul-time entry?")){ DB.soul=DB.soul.filter(x=>x.id!==existing.id); save(); close(); render(); toast("Deleted"); } };
+    const delBtn=root.querySelector("#del"); if(delBtn) delBtn.onclick=()=>{ if(confirm("Delete this soul-time entry?")){ removeById("soul",existing.id); save(); close(); render(); toast("Deleted"); } };
     root.querySelector("#ok").onclick=()=>{
       const activity=val(root,"soAct"); if(!activity){ toast("What did you do?"); return; }
       const rec={ id:existing?existing.id:uid(), activity,
@@ -806,7 +811,7 @@ function openWeight(existing=null){
     let unitSel=unit;
     root.querySelectorAll("#wtUnit button").forEach(b=>b.onclick=()=>{ unitSel=b.dataset.v; root.querySelectorAll("#wtUnit button").forEach(x=>x.classList.toggle("on",x===b)); });
     root.querySelector("#cancel").onclick=close;
-    const delBtn=root.querySelector("#del"); if(delBtn) delBtn.onclick=()=>{ if(confirm("Delete this weigh-in?")){ DB.weights=DB.weights.filter(x=>x.id!==existing.id); save(); close(); render(); toast("Deleted"); } };
+    const delBtn=root.querySelector("#del"); if(delBtn) delBtn.onclick=()=>{ if(confirm("Delete this weigh-in?")){ removeById("weights",existing.id); save(); close(); render(); toast("Deleted"); } };
     root.querySelector("#ok").onclick=()=>{
       const val0=val(root,"wtVal"); if(!val0){ toast("Enter a weight"); return; }
       DB.weightUnit=unitSel; // remember last-used unit
@@ -894,7 +899,7 @@ function openMeal(existing=null){
     };
     wireAfterRemoval(listEl);
     root.querySelector("#cancel").onclick=close;
-    const delBtn=root.querySelector("#del"); if(delBtn) delBtn.onclick=()=>{ if(confirm("Delete this meal entry? (Linked after-symptoms stay unless you delete them.)")){ DB.meals=DB.meals.filter(x=>x.id!==existing.id); save(); close(); render(); toast("Deleted"); } };
+    const delBtn=root.querySelector("#del"); if(delBtn) delBtn.onclick=()=>{ if(confirm("Delete this meal entry? (Linked after-symptoms stay unless you delete them.)")){ removeById("meals",existing.id); save(); close(); render(); toast("Deleted"); } };
     root.querySelector("#ok").onclick=()=>{
       const afterArr=[...listEl.querySelectorAll(".afterRow")].map(r=>({
         name:r.querySelector(".afName").value.trim(),
@@ -913,13 +918,18 @@ function openMeal(existing=null){
         notes:val(root,"mlNotes"),
         createdAt:existing?existing.createdAt:nowISO(), updatedAt:nowISO(),
       };
-      // Sync linked symptom entries (tagged with mealId) so correlations work.
-      DB.symptoms = DB.symptoms.filter(s=>s.mealId!==rec.id); // clear old links
-      afterArr.forEach(a=>{
-        DB.symptoms.push({ id:uid(), name:a.name, timestamp:timeEaten, durationMinutes:a.durationMinutes,
+      // Rebuild linked symptom entries (tagged with mealId) with STABLE ids so edits + sync dedupe cleanly.
+      const oldLinks=DB.symptoms.filter(s=>s.mealId===rec.id).map(s=>s.id);
+      DB.symptoms = DB.symptoms.filter(s=>s.mealId!==rec.id);
+      const newIds=[];
+      afterArr.forEach((a,idx)=>{
+        const sid=`${rec.id}-after-${idx}`; newIds.push(sid);
+        DB.symptoms.push({ id:sid, name:a.name, timestamp:timeEaten, durationMinutes:a.durationMinutes,
           severity:null, notes:`After meal: ${rec.description||"(meal)"}`, mealId:rec.id, createdAt:nowISO(), updatedAt:nowISO() });
         if(!DB.commonSymptoms.some(c=>c.toLowerCase()===a.name.toLowerCase())) DB.commonSymptoms.push(a.name);
       });
+      DB._deleted=DB._deleted||{};
+      oldLinks.forEach(oid=>{ if(!newIds.includes(oid)) DB._deleted[oid]=nowISO(); });
       if(existing){ const i=DB.meals.findIndex(x=>x.id===existing.id); DB.meals[i]=rec; } else DB.meals.push(rec);
       save(); close(); render(); toast("✓ Meal context logged");
     };
@@ -1497,6 +1507,8 @@ function renderSettings(){
         :`<p class="sub" style="margin:0">On Android Chrome: menu (⋮) → <b>Install app</b> / <b>Add to Home screen</b>.<br>On iPhone Safari: Share → <b>Add to Home Screen</b>.</p>`}
     </div>`:""}
 
+    ${syncCardHTML()}
+
     <h2>Add from Claude</h2>
     <p class="sub">Told Claude about your day? Paste the block it gives you here and it files everything at once — nothing gets overwritten.</p>
     <textarea id="claudePaste" placeholder='Paste the block from Claude (starts with { … )' style="min-height:110px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px"></textarea>
@@ -1609,8 +1621,8 @@ function editMedDef(id=null){
 function deleteMedDef(id){
   const n=DB.medDoses.filter(d=>d.medId===id).length;
   if(!confirm(`Delete this medication${n?` and its ${n} logged dose${n>1?"s":""}`:""}?`)) return;
-  DB.meds=DB.meds.filter(x=>x.id!==id);
-  DB.medDoses=DB.medDoses.filter(d=>d.medId!==id);
+  DB.medDoses.filter(d=>d.medId===id).forEach(d=>removeById("medDoses",d.id));
+  removeById("meds",id);
   save(); renderSettings(); toast("Deleted");
 }
 
@@ -1670,8 +1682,177 @@ if("serviceWorker" in navigator){
   window.addEventListener("load",()=>{ navigator.serviceWorker.register("./sw.js").catch(()=>{}); });
 }
 
+/* ============================================================
+   GOOGLE DRIVE SYNC  (phone <-> laptop, via the user's own Drive)
+   Scope: drive.file — the app can only see files it creates.
+   ============================================================ */
+const SYNC = { connected:false, status:null, _resolve:null, _reject:null };
+const SYNC_ARRAYS = ["symptoms","meds","medDoses","bp","sleep","meals","moods","soul","weights"];
+const DRIVE_FILE = "health-log-data.json";
+let accessToken=null, tokenExpiry=0, tokenClient=null, syncing=false, syncTimer=null;
+
+function getClientId(){ return (localStorage.getItem("healthlog.clientId")||"").trim(); }
+function setClientId(v){ localStorage.setItem("healthlog.clientId",(v||"").trim()); }
+
+/* Conflict-safe merge: union every entry by id (newer updatedAt wins),
+   honor tombstones so deletions stick, union the chip lists. */
+function mergeDB(local, remote){
+  const out = structuredClone(local);
+  const td = {};
+  [local._deleted||{}, remote._deleted||{}].forEach(src=>{ for(const id in src){ if(!td[id] || new Date(src[id])>new Date(td[id])) td[id]=src[id]; } });
+  out._deleted = td;
+  SYNC_ARRAYS.forEach(k=>{
+    const map={};
+    (local[k]||[]).forEach(it=>{ if(it&&it.id) map[it.id]=it; });
+    (remote[k]||[]).forEach(it=>{ if(!it||!it.id) return; const ex=map[it.id];
+      if(!ex) map[it.id]=it;
+      else { const a=new Date(ex.updatedAt||ex.createdAt||0), b=new Date(it.updatedAt||it.createdAt||0); if(b>a) map[it.id]=it; } });
+    out[k]=Object.values(map).filter(it=>{ const t=td[it.id]; if(!t) return true; const u=new Date(it.updatedAt||it.createdAt||0); return u>new Date(t); });
+  });
+  ["commonSymptoms","commonMoods","commonSoul"].forEach(k=>{
+    const m=new Map(); (local[k]||[]).concat(remote[k]||[]).forEach(v=>{ if(v&&!m.has(String(v).toLowerCase())) m.set(String(v).toLowerCase(),v); });
+    out[k]=[...m.values()];
+  });
+  out.weightUnit = local.weightUnit || remote.weightUnit || "lb";
+  return out;
+}
+
+function ensureTokenClient(){
+  if(tokenClient) return tokenClient;
+  const cid=getClientId(); if(!cid) return null;
+  if(!(window.google && google.accounts && google.accounts.oauth2)) return null;
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: cid,
+    scope: "https://www.googleapis.com/auth/drive.file",
+    callback: (resp)=>{
+      if(resp && resp.access_token){ accessToken=resp.access_token; tokenExpiry=Date.now()+((resp.expires_in||3600)*1000);
+        if(SYNC._resolve){ const r=SYNC._resolve; SYNC._resolve=SYNC._reject=null; r(accessToken); } }
+      else if(SYNC._reject){ const r=SYNC._reject; SYNC._resolve=SYNC._reject=null; r(new Error(resp&&resp.error||"sign-in failed")); }
+    },
+  });
+  return tokenClient;
+}
+function getToken(interactive){
+  return new Promise((resolve,reject)=>{
+    if(accessToken && Date.now()<tokenExpiry-60000){ resolve(accessToken); return; }
+    const tc=ensureTokenClient();
+    if(!tc){ reject(new Error("Google sign-in isn’t ready yet")); return; }
+    SYNC._resolve=resolve; SYNC._reject=reject;
+    try{ tc.requestAccessToken({prompt: interactive?"consent":""}); }catch(e){ SYNC._resolve=SYNC._reject=null; reject(e); }
+  });
+}
+async function driveFetch(url,opts){
+  if(!accessToken) throw new Error("Not connected");
+  opts=opts||{}; opts.headers=Object.assign({}, opts.headers||{}, {Authorization:"Bearer "+accessToken});
+  const res=await fetch(url,opts);
+  if(res.status===401){ accessToken=null; throw new Error("Google session expired — Connect again"); }
+  if(!res.ok) throw new Error("Drive error "+res.status);
+  return res;
+}
+async function driveFind(){
+  const q=encodeURIComponent("name='"+DRIVE_FILE+"' and trashed=false");
+  const res=await driveFetch("https://www.googleapis.com/drive/v3/files?spaces=drive&fields=files(id,modifiedTime)&q="+q);
+  const j=await res.json(); return (j.files&&j.files[0])||null;
+}
+async function driveDownload(id){ const res=await driveFetch("https://www.googleapis.com/drive/v3/files/"+id+"?alt=media"); return await res.json(); }
+async function driveCreate(data){
+  const meta={name:DRIVE_FILE, mimeType:"application/json"};
+  const b="hlb"+Math.random().toString(36).slice(2);
+  const body="--"+b+"\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n"+JSON.stringify(meta)+
+    "\r\n--"+b+"\r\nContent-Type: application/json\r\n\r\n"+JSON.stringify(data)+"\r\n--"+b+"--";
+  const res=await driveFetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id",
+    {method:"POST",headers:{"Content-Type":"multipart/related; boundary="+b},body});
+  return (await res.json()).id;
+}
+async function driveUpdate(id,data){
+  await driveFetch("https://www.googleapis.com/upload/drive/v3/files/"+id+"?uploadType=media",
+    {method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});
+}
+
+function setSyncStatus(s){ SYNC.status=s; if(TAB==="settings") renderSettings(); }
+async function syncNow(interactive){
+  if(syncing) return;
+  if(!getClientId()){ if(interactive) toast("Paste your Google key first"); return; }
+  syncing=true; setSyncStatus("syncing");
+  try{
+    await getToken(interactive);
+    let file=await driveFind();
+    if(file){ let remote=null; try{ remote=await driveDownload(file.id); }catch(e){}
+      if(remote && typeof remote==="object"){ DB=mergeDB(DB, remote); save0(); }
+      await driveUpdate(file.id, DB);
+    } else {
+      await driveCreate(DB);
+    }
+    localStorage.setItem("healthlog.connected","1");
+    localStorage.setItem("healthlog.lastSync", nowISO());
+    SYNC.connected=true; SYNC.status=null;
+    render();
+    if(interactive) toast("✓ Synced with Drive");
+  }catch(e){
+    SYNC.status="error:"+(e&&e.message||e);
+    if(interactive) toast("⚠️ "+(e&&e.message||"Sync failed"));
+    if(/expired|Not connected|sign-in/i.test(String(e&&e.message))) SYNC.connected=false;
+  }finally{ syncing=false; if(TAB==="settings") renderSettings(); }
+}
+function scheduleSync(){
+  if(!SYNC.connected) return;
+  clearTimeout(syncTimer);
+  syncTimer=setTimeout(()=>syncNow(false), 2500);
+}
+function connectDrive(){ syncNow(true); }
+function disconnectDrive(){ localStorage.removeItem("healthlog.connected"); SYNC.connected=false; accessToken=null; toast("Disconnected — data stays on this device"); if(TAB==="settings") renderSettings(); }
+function saveClientId(){
+  const el=document.getElementById("gcid"); if(!el) return;
+  const v=el.value.trim();
+  if(!/apps\.googleusercontent\.com/.test(v)){ toast("That doesn’t look like a Client ID"); return; }
+  setClientId(v); tokenClient=null; toast("Key saved — now Connect"); renderSettings();
+}
+function initSyncOnBoot(){
+  SYNC.connected = localStorage.getItem("healthlog.connected")==="1" && !!getClientId();
+  if(!SYNC.connected) return;
+  let n=0; const t=setInterval(()=>{ n++;
+    if(window.google && google.accounts && google.accounts.oauth2){ clearInterval(t); syncNow(false); }
+    else if(n>25){ clearInterval(t); }
+  },300);
+}
+function syncCardHTML(){
+  const cid=getClientId();
+  const last=localStorage.getItem("healthlog.lastSync");
+  const busy = SYNC.status==="syncing";
+  if(!cid){
+    return `<div class="insight card">
+      <p class="ih">☁️ Sync across devices</p>
+      <p class="sub" style="margin:0 0 8px">Keep your phone and laptop in step through <b>your own</b> Google Drive. One-time setup gives the app a “key.” Paste it here.</p>
+      <input id="gcid" placeholder="…apps.googleusercontent.com" style="font-family:ui-monospace,monospace; font-size:13px" />
+      <button class="btn primary small" style="margin-top:8px" onclick="saveClientId()">Save key</button>
+      <p class="sub" style="margin:8px 2px 0">Need the key? Ask Claude for the Google setup steps.</p>
+    </div>`;
+  }
+  if(!SYNC.connected){
+    return `<div class="insight card">
+      <p class="ih">☁️ Sync across devices</p>
+      <p class="sub" style="margin:0 0 8px">Key saved. Connect to your Google Drive to turn on syncing.</p>
+      <div class="inline">
+        <button class="btn primary small" onclick="connectDrive()" ${busy?"disabled":""}>${busy?"Connecting…":"Connect Google Drive"}</button>
+        <button class="btn ghost small" onclick="setClientId('');renderSettings()">Change key</button>
+      </div>
+      ${SYNC.status&&SYNC.status.startsWith("error")?`<p class="sub" style="color:var(--danger);margin:8px 2px 0">${esc(SYNC.status.slice(6))}</p>`:""}
+    </div>`;
+  }
+  return `<div class="insight card" style="border-color:var(--good)">
+    <p class="ih">☁️ Sync on — Google Drive</p>
+    <p class="sub" style="margin:0 0 8px">${busy?"Syncing…":`Synced${last?` · last ${ago(last)}`:""}. Changes sync automatically.`}</p>
+    <div class="inline">
+      <button class="btn ghost small" onclick="syncNow(true)" ${busy?"disabled":""}>Sync now</button>
+      <button class="btn ghost small" onclick="disconnectDrive()">Disconnect</button>
+    </div>
+    ${SYNC.status&&SYNC.status.startsWith("error")?`<p class="sub" style="color:var(--danger);margin:8px 2px 0">${esc(SYNC.status.slice(6))}</p>`:""}
+  </div>`;
+}
+
 /* boot */
 render();
+initSyncOnBoot();
 </script>
 </body>
 </html>
