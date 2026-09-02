@@ -1,6 +1,6 @@
 /* Health Log service worker — offline app shell.
    Bump CACHE when the app files change so clients update. */
-const CACHE = "healthlog-v4";
+const CACHE = "healthlog-v5";
 const SHELL = [
   "./",
   "./index.html",

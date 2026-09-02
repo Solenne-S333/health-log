@@ -234,6 +234,7 @@ const DEFAULT_DB = {
   commonMoods: ["Calm", "Anxious", "Low", "Irritable", "Content", "Overwhelmed", "Hopeful", "Flat"],
   commonSoul: ["Kingdom tour", "Coffee ritual", "Time with Presence", "Plant tending", "Baking", "Journaling", "Meditation"],
   _deleted: {},      // { entryId: ISO time of deletion } — tombstones so deletes sync across devices
+  _deletedChips: {}, // { listKey: { lowerValue: ISO } } — tombstones for removed chips (symptoms/moods/soul)
 };
 const MOOD_FACES = [ {v:1,e:"😞",l:"Awful"}, {v:2,e:"😕",l:"Low"}, {v:3,e:"😐",l:"Okay"}, {v:4,e:"🙂",l:"Good"}, {v:5,e:"😄",l:"Great"} ];
 
@@ -250,6 +251,18 @@ function save0(){ try{ localStorage.setItem(DB_KEY, JSON.stringify(DB)); }catch(
 function save(){ save0(); scheduleSync(); }
 // Delete an entry AND leave a tombstone, so the deletion propagates through sync.
 function removeById(key,id){ DB[key]=DB[key].filter(x=>x.id!==id); DB._deleted=DB._deleted||{}; DB._deleted[id]=nowISO(); }
+// Chip lists (common symptoms/moods/soul) need tombstones too, or sync's union re-adds deletions.
+function addChip(key, v){
+  v=String(v||"").trim(); if(!v) return;
+  if(!DB[key].some(c=>c.toLowerCase()===v.toLowerCase())) DB[key].push(v);
+  if(DB._deletedChips && DB._deletedChips[key]) delete DB._deletedChips[key][v.toLowerCase()]; // re-adding un-deletes
+}
+function removeChip(key, i){
+  const v=DB[key][i]; if(v==null) return;
+  DB[key].splice(i,1);
+  DB._deletedChips=DB._deletedChips||{}; DB._deletedChips[key]=DB._deletedChips[key]||{};
+  DB._deletedChips[key][String(v).toLowerCase()]=nowISO();
+}
 
 /* ---------- helpers ---------- */
 const MED_TYPES = ["Injection","Patch","Biologic","Eye drops","Other"];
@@ -486,7 +499,7 @@ function val(scope,id){ const el=scope.querySelector("#"+id); return el?el.value
 /* ============================================================
    SYMPTOM
    ============================================================ */
-function openSymptom(existing=null, prefillName=""){
+function openSymptom(existing=null, prefillName="", prefillTime=null){
   const s = existing || {};
   const sev = s.severity ?? null;
   const inner = `
@@ -496,7 +509,7 @@ function openSymptom(existing=null, prefillName=""){
     </div>
     <input id="symName" placeholder="e.g. Headache" value="${esc(s.name||prefillName)}" />
     <div class="row">
-      <div><label>Time noticed</label><input type="datetime-local" id="symTime" value="${s.timestamp?toLocalInput(new Date(s.timestamp)):nowLocalInput()}" /></div>
+      <div><label>Time noticed</label><input type="datetime-local" id="symTime" value="${s.timestamp?toLocalInput(new Date(s.timestamp)):(prefillTime?toLocalInput(new Date(prefillTime)):nowLocalInput())}" /></div>
       <div><label>Duration (min)</label><input type="number" inputmode="numeric" id="symDur" placeholder="optional" value="${s.durationMinutes??""}" /></div>
     </div>
     <label>Severity (1–10)</label>
@@ -505,6 +518,7 @@ function openSymptom(existing=null, prefillName=""){
     </div>
     <label>Notes</label>
     <textarea id="symNotes" placeholder="free text — what it felt like, triggers…">${esc(s.notes||"")}</textarea>
+    ${existing?"":`<button class="btn ghost" id="okAnother" style="width:100%;margin-top:14px">Save &amp; add another symptom ＋</button>`}
     <div class="actions">
       ${existing?`<button class="btn danger small" id="del">Delete</button>`:""}
       <button class="btn ghost" id="cancel">Cancel</button>
@@ -519,12 +533,13 @@ function openSymptom(existing=null, prefillName=""){
     root.querySelectorAll("#symChips .chip").forEach(b=>b.onclick=()=>{ root.querySelector("#symName").value=b.dataset.n; });
     root.querySelector("#cancel").onclick=close;
     const delBtn=root.querySelector("#del"); if(delBtn) delBtn.onclick=()=>{ if(confirm("Delete this symptom entry?")){ removeById("symptoms",existing.id); save(); close(); render(); toast("Deleted"); } };
-    root.querySelector("#ok").onclick=()=>{
+    const doSave=(again)=>{
       const name=val(root,"symName"); if(!name){ toast("Add a symptom name"); return; }
+      const ts=new Date(root.querySelector("#symTime").value||Date.now()).toISOString();
       const rec={
         id: existing?existing.id:uid(),
         name,
-        timestamp: new Date(root.querySelector("#symTime").value||Date.now()).toISOString(),
+        timestamp: ts,
         durationMinutes: val(root,"symDur")||null,
         severity,
         notes: val(root,"symNotes"),
@@ -532,10 +547,13 @@ function openSymptom(existing=null, prefillName=""){
       };
       if(existing){ const i=DB.symptoms.findIndex(x=>x.id===existing.id); DB.symptoms[i]=rec; }
       else DB.symptoms.push(rec);
-      // learn new common symptom
-      if(!DB.commonSymptoms.some(c=>c.toLowerCase()===name.toLowerCase())) DB.commonSymptoms.push(name);
-      save(); close(); render(); toast("✓ Symptom logged");
+      addChip("commonSymptoms", name); // learn (and un-tombstone) the symptom name
+      save(); close(); toast("✓ Symptom logged");
+      if(again) openSymptom(null, "", ts);   // reopen a fresh one at the SAME time
+      else render();
     };
+    root.querySelector("#ok").onclick=()=>doSave(false);
+    const anBtn=root.querySelector("#okAnother"); if(anBtn) anBtn.onclick=()=>doSave(true);
   });
 }
 
@@ -777,7 +795,7 @@ function openSoul(existing=null, prefillActivity=""){
         durationMinutes: val(root,"soDur")||null, rating:curRate,
         notes:val(root,"soNotes"), createdAt:existing?existing.createdAt:nowISO(), updatedAt:nowISO() };
       if(existing){ const i=DB.soul.findIndex(x=>x.id===existing.id); DB.soul[i]=rec; } else DB.soul.push(rec);
-      if(!DB.commonSoul.some(c=>c.toLowerCase()===activity.toLowerCase())) DB.commonSoul.push(activity);
+      addChip("commonSoul", activity);
       save(); close(); render(); toast("🌿 Soul time logged");
     };
   });
@@ -926,7 +944,7 @@ function openMeal(existing=null){
         const sid=`${rec.id}-after-${idx}`; newIds.push(sid);
         DB.symptoms.push({ id:sid, name:a.name, timestamp:timeEaten, durationMinutes:a.durationMinutes,
           severity:null, notes:`After meal: ${rec.description||"(meal)"}`, mealId:rec.id, createdAt:nowISO(), updatedAt:nowISO() });
-        if(!DB.commonSymptoms.some(c=>c.toLowerCase()===a.name.toLowerCase())) DB.commonSymptoms.push(a.name);
+        addChip("commonSymptoms", a.name);
       });
       DB._deleted=DB._deleted||{};
       oldLinks.forEach(oid=>{ if(!newIds.includes(oid)) DB._deleted[oid]=nowISO(); });
@@ -1583,24 +1601,24 @@ function renderSettings(){
 function addCommon(){
   const el=document.getElementById("newCommon"); const v=el.value.trim();
   if(!v) return;
-  if(!DB.commonSymptoms.some(c=>c.toLowerCase()===v.toLowerCase())) DB.commonSymptoms.push(v);
+  addChip("commonSymptoms", v);
   save(); renderSettings();
 }
-function removeCommon(i){ DB.commonSymptoms.splice(i,1); save(); renderSettings(); }
+function removeCommon(i){ removeChip("commonSymptoms", i); save(); renderSettings(); }
 function addMood(){
   const el=document.getElementById("newMood"); const v=el.value.trim();
   if(!v) return;
-  if(!DB.commonMoods.some(c=>c.toLowerCase()===v.toLowerCase())) DB.commonMoods.push(v);
+  addChip("commonMoods", v);
   save(); renderSettings();
 }
-function removeMood(i){ DB.commonMoods.splice(i,1); save(); renderSettings(); }
+function removeMood(i){ removeChip("commonMoods", i); save(); renderSettings(); }
 function addSoul(){
   const el=document.getElementById("newSoul"); const v=el.value.trim();
   if(!v) return;
-  if(!DB.commonSoul.some(c=>c.toLowerCase()===v.toLowerCase())) DB.commonSoul.push(v);
+  addChip("commonSoul", v);
   save(); renderSettings();
 }
-function removeSoul(i){ DB.commonSoul.splice(i,1); save(); renderSettings(); }
+function removeSoul(i){ removeChip("commonSoul", i); save(); renderSettings(); }
 
 function editMedDef(id=null){
   const m = id? DB.meds.find(x=>x.id===id) : {};
@@ -1716,9 +1734,14 @@ function mergeDB(local, remote){
       else { const a=new Date(ex.updatedAt||ex.createdAt||0), b=new Date(it.updatedAt||it.createdAt||0); if(b>a) map[it.id]=it; } });
     out[k]=Object.values(map).filter(it=>{ const t=td[it.id]; if(!t) return true; const u=new Date(it.updatedAt||it.createdAt||0); return u>new Date(t); });
   });
+  // Merge chip tombstones (latest wins per value), then union the chip lists minus anything tombstoned.
+  const dc={};
+  [local._deletedChips||{}, remote._deletedChips||{}].forEach(src=>{ for(const k in src){ dc[k]=dc[k]||{}; for(const v in src[k]){ if(!dc[k][v] || new Date(src[k][v])>new Date(dc[k][v])) dc[k][v]=src[k][v]; } } });
+  out._deletedChips=dc;
   ["commonSymptoms","commonMoods","commonSoul"].forEach(k=>{
     const m=new Map(); (local[k]||[]).concat(remote[k]||[]).forEach(v=>{ if(v&&!m.has(String(v).toLowerCase())) m.set(String(v).toLowerCase(),v); });
-    out[k]=[...m.values()];
+    const tomb=dc[k]||{};
+    out[k]=[...m.values()].filter(v=>!tomb[String(v).toLowerCase()]);
   });
   out.weightUnit = local.weightUnit || remote.weightUnit || "lb";
   return out;
