@@ -15,7 +15,7 @@
     --bg:#f6f7f9; --surface:#ffffff; --surface-2:#eef1f5; --line:#dde2ea;
     --text:#141a22; --muted:#5b6672; --accent:#2f6df6; --accent-soft:#e6efff;
     --danger:#c8443c; --good:#1f9d63; --warn:#c98a12;
-    --sym:#e0567a; --med:#7a5cf0; --bp:#c8443c; --sleep:#2b7fd4; --meal:#1f9d63; --mood:#0d9b8a; --soul:#c77d2e; --weight:#9c5c8f;
+    --sym:#e0567a; --med:#7a5cf0; --bp:#c8443c; --sleep:#2b7fd4; --meal:#1f9d63; --mood:#0d9b8a; --soul:#c77d2e; --weight:#9c5c8f; --bowel:#8a6a4a;
     --s-mood:#0d9b8a; --s-energy:#c77d2e; --grid:rgba(20,26,34,.09); --axis:#98a2b0;
     --radius:14px; --shadow:0 1px 2px rgba(16,24,40,.06),0 4px 16px rgba(16,24,40,.05);
     --tap:52px; --maxw:720px;
@@ -25,7 +25,7 @@
       --bg:#0f141b; --surface:#161d27; --surface-2:#1e2633; --line:#2a3543;
       --text:#e8edf4; --muted:#95a2b3; --accent:#5b8cff; --accent-soft:#1b2740;
       --danger:#f0736b; --good:#4cc389; --warn:#e0aa3e;
-      --sym:#f07a9a; --med:#a48bff; --bp:#f0736b; --sleep:#5aa6ef; --meal:#4cc389; --mood:#3dc9b5; --soul:#e3a24f; --weight:#c184b3;
+      --sym:#f07a9a; --med:#a48bff; --bp:#f0736b; --sleep:#5aa6ef; --meal:#4cc389; --mood:#3dc9b5; --soul:#e3a24f; --weight:#c184b3; --bowel:#b08a63;
       --s-mood:#22a08d; --s-energy:#c07f2e; --grid:rgba(232,237,244,.12); --axis:#7c8896;
       --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 20px rgba(0,0,0,.3);
     }
@@ -229,6 +229,7 @@ const DEFAULT_DB = {
   moods: [],         // {id, timestamp, rating(1-5), energy(1-5|null), tags[], notes, createdAt, updatedAt}
   soul: [],          // {id, timestamp, activity, durationMinutes, rating(1-5|null), notes, createdAt, updatedAt}
   weights: [],       // {id, timestamp, weight(number), unit("lb"|"kg"), notes, createdAt, updatedAt}
+  bowel: [],         // {id, timestamp, bristol(1-7|null), flags[], notes, createdAt, updatedAt}
   weightUnit: "lb",
   commonSymptoms: ["Headache", "Fatigue", "Nausea", "Joint pain", "Dizziness", "Brain fog"],
   commonMoods: ["Calm", "Anxious", "Low", "Irritable", "Content", "Overwhelmed", "Hopeful", "Flat"],
@@ -349,6 +350,9 @@ function allEvents(){
   for(const w of DB.weights) ev.push({id:w.id,module:"weight",ts:w.timestamp,
     title:`${w.weight} ${w.unit||DB.weightUnit||"lb"}`,
     detail:"", note:w.notes, raw:w});
+  for(const bm of DB.bowel) ev.push({id:bm.id,module:"bowel",ts:bm.timestamp,
+    title:"Bowel movement"+(bm.bristol?` — type ${bm.bristol}`:""),
+    detail:(bm.flags&&bm.flags.length)?bm.flags.join(", "):"", note:bm.notes, raw:bm});
   ev.sort((a,b)=> new Date(b.ts)-new Date(a.ts));
   return ev;
 }
@@ -361,6 +365,7 @@ const MOD = {
   mood:{label:"Mood",color:"var(--mood)",ico:"🧠"},
   soul:{label:"Soul time",color:"var(--soul)",ico:"🌿"},
   weight:{label:"Weight",color:"var(--weight)",ico:"⚖️"},
+  bowel:{label:"Bowel",color:"var(--bowel)",ico:"🚽"},
 };
 function moodFace(r){ const f=MOOD_FACES.find(x=>x.v===Number(r)); return f?f.e:""; }
 function moodLabel(r){ const f=MOOD_FACES.find(x=>x.v===Number(r)); return f?f.l:""; }
@@ -407,6 +412,7 @@ function renderLog(){
       ${modBtn("mood","🧠","Mood","how you feel right now")}
       ${modBtn("soul","🌿","Soul time","nourishing time for you")}
       ${modBtn("weight","⚖️","Weight","log a weigh-in")}
+      ${modBtn("bowel","🚽","Bowel","movement + Bristol")}
       <button class="modbtn" onclick="setTab('summary')">
         <span class="ico">🩺</span>
         <span class="lbl">Doctor summary</span>
@@ -470,6 +476,7 @@ function openForm(mod){
   if(mod==="mood") return openMood();
   if(mod==="soul") return openSoul();
   if(mod==="weight") return openWeight();
+  if(mod==="bowel") return openBowel();
 }
 function quickMood(rating){
   DB.moods.push({ id:uid(), timestamp:nowISO(), rating, energy:null, tags:[], notes:"", createdAt:nowISO(), updatedAt:nowISO() });
@@ -843,6 +850,54 @@ function openWeight(existing=null){
 }
 
 /* ============================================================
+   BOWEL  (movements — Bristol stool scale)
+   ============================================================ */
+const BM_FLAGS = ["Blood","Mucus","Urgency","Pain","Incomplete","Straining"];
+function openBowel(existing=null, prefillTime=null){
+  const b=existing||{};
+  const bristol=b.bristol??null;
+  const flags=new Set(b.flags||[]);
+  const inner=`
+    <label>Time</label>
+    <input type="datetime-local" id="bmTime" value="${b.timestamp?toLocalInput(new Date(b.timestamp)):(prefillTime?toLocalInput(new Date(prefillTime)):nowLocalInput())}" />
+    <label>Bristol type (1–7)</label>
+    <div class="sevrow" id="bmType">
+      ${[1,2,3,4,5,6,7].map(n=>`<button type="button" class="sev ${bristol===n?"on":""}" data-v="${n}">${n}</button>`).join("")}
+    </div>
+    <p class="sub" style="margin:6px 2px 0">1–2 hard/lumpy · 3–4 formed (ideal) · 5 soft · 6–7 loose/liquid</p>
+    <label>Anything notable? <span class="muted">(tap any)</span></label>
+    <div class="chips" id="bmFlags">
+      ${BM_FLAGS.map(f=>`<button type="button" class="chip" data-f="${esc(f)}" aria-pressed="${flags.has(f)}">${esc(f)}</button>`).join("")}
+    </div>
+    <label>Notes</label>
+    <textarea id="bmNotes" placeholder="color, effort, pain, urgency…">${esc(b.notes||"")}</textarea>
+    <div class="actions">
+      ${existing?`<button class="btn danger small" id="del">Delete</button>`:""}
+      <button class="btn ghost" id="cancel">Cancel</button>
+      <button class="btn primary" id="ok">${existing?"Save":"Log"}</button>
+    </div>`;
+  sheet(existing?"Edit bowel movement":"Log bowel movement", inner, (root,close)=>{
+    let type=bristol;
+    root.querySelectorAll("#bmType .sev").forEach(bt=>bt.onclick=()=>{ type=Number(bt.dataset.v); root.querySelectorAll("#bmType .sev").forEach(x=>x.classList.toggle("on",x===bt)); });
+    root.querySelectorAll("#bmFlags .chip").forEach(bt=>bt.onclick=()=>{
+      const f=bt.dataset.f;
+      if(flags.has(f)){ flags.delete(f); bt.style.background=""; bt.setAttribute("aria-pressed","false"); }
+      else { flags.add(f); bt.style.background="var(--accent-soft)"; bt.setAttribute("aria-pressed","true"); }
+    });
+    root.querySelectorAll("#bmFlags .chip").forEach(bt=>{ if(flags.has(bt.dataset.f)) bt.style.background="var(--accent-soft)"; });
+    root.querySelector("#cancel").onclick=close;
+    const delBtn=root.querySelector("#del"); if(delBtn) delBtn.onclick=()=>{ if(confirm("Delete this entry?")){ removeById("bowel",existing.id); save(); close(); render(); toast("Deleted"); } };
+    root.querySelector("#ok").onclick=()=>{
+      const rec={ id:existing?existing.id:uid(), bristol:type, flags:[...flags],
+        timestamp:new Date(root.querySelector("#bmTime").value||Date.now()).toISOString(),
+        notes:val(root,"bmNotes"), createdAt:existing?existing.createdAt:nowISO(), updatedAt:nowISO() };
+      if(existing){ const i=DB.bowel.findIndex(x=>x.id===existing.id); DB.bowel[i]=rec; } else DB.bowel.push(rec);
+      save(); close(); render(); toast("✓ Logged");
+    };
+  });
+}
+
+/* ============================================================
    MEAL CONTEXT  (context, not calories)
    ============================================================ */
 function openMeal(existing=null){
@@ -990,6 +1045,7 @@ function editEvent(module,id){
   if(module==="mood") return openMood(DB.moods.find(x=>x.id===id));
   if(module==="soul") return openSoul(DB.soul.find(x=>x.id===id));
   if(module==="weight") return openWeight(DB.weights.find(x=>x.id===id));
+  if(module==="bowel") return openBowel(DB.bowel.find(x=>x.id===id));
 }
 
 /* ============================================================
@@ -1071,10 +1127,11 @@ function dailyAgg(from,to){
   const end=new Date(to); end.setHours(0,0,0,0);
   while(d<=end){ days.push(new Date(d)); d.setDate(d.getDate()+1); }
   const map={}; const K=x=>new Date(x).toDateString();
-  days.forEach(dd=>map[dd.toDateString()]={date:dd,moods:[],energy:[],symCount:0,symSev:[],symNames:[],sleepH:null,sleepQ:null,sys:[],dia:[],pulse:[],soulMin:0,soulCount:0,weights:[]});
+  days.forEach(dd=>map[dd.toDateString()]={date:dd,moods:[],energy:[],symCount:0,symSev:[],symNames:[],sleepH:null,sleepQ:null,sys:[],dia:[],pulse:[],soulMin:0,soulCount:0,weights:[],bowel:0,bristol:[]});
   const wUnit=DB.weightUnit||"lb";
   const toU=w=>{ const u=w.unit||wUnit; return u===wUnit? Number(w.weight) : (u==="kg"? Number(w.weight)*2.20462 : Number(w.weight)/2.20462); };
   DB.weights.forEach(w=>{const k=K(w.timestamp); if(map[k]) map[k].weights.push(toU(w));});
+  DB.bowel.forEach(x=>{const k=K(x.timestamp); if(map[k]){ map[k].bowel++; if(x.bristol) map[k].bristol.push(x.bristol); }});
   DB.moods.forEach(m=>{const k=K(m.timestamp); if(map[k]){ if(m.rating!=null)map[k].moods.push(m.rating); if(m.energy!=null)map[k].energy.push(m.energy);} });
   DB.symptoms.forEach(s=>{const k=K(s.timestamp); if(map[k]){ map[k].symCount++; if(s.severity!=null)map[k].symSev.push(Number(s.severity)); map[k].symNames.push(s.name);} });
   DB.sleep.forEach(s=>{const k=K(s.timestamp); if(map[k]){ map[k].sleepH=(map[k].sleepH||0)+Number(s.hours||0); if(s.quality!=null)map[k].sleepQ=s.quality;} });
@@ -1152,7 +1209,7 @@ function renderTrends(){
   TIPREG={}; TIP_N=0;
   const to=new Date(); const from=new Date(); from.setDate(from.getDate()-(trend.days-1)); from.setHours(0,0,0,0);
   const days=dailyAgg(from,to);
-  const any = DB.moods.length||DB.symptoms.length||DB.sleep.length||DB.bp.length||DB.soul.length||DB.weights.length;
+  const any = DB.moods.length||DB.symptoms.length||DB.sleep.length||DB.bp.length||DB.soul.length||DB.weights.length||DB.bowel.length;
 
   // series
   const moodV=days.map(d=>avg(d.moods)), enV=days.map(d=>avg(d.energy));
@@ -1168,6 +1225,8 @@ function renderTrends(){
   const wVals=wV.filter(v=>v!=null);
   const wMin=wVals.length?Math.floor((Math.min(...wVals)-2)):0, wMax=wVals.length?Math.ceil((Math.max(...wVals)+2)):1;
   const hasWeight=wVals.length>0;
+  const bmV=days.map(d=>d.bowel||0), maxBM=Math.max(1,...bmV);
+  const hasBowel=bmV.some(v=>v>0);
   const hasMood=moodV.some(v=>v!=null)||enV.some(v=>v!=null);
   const hasBP=sysV.some(v=>v!=null);
   const hasSleep=sleepV.some(v=>v!=null);
@@ -1233,6 +1292,14 @@ function renderTrends(){
     charts+=card("Weight",last?`${round1(avg(last.weights))} ${wUnit}`:"",`In ${wUnit}. Latest weigh-ins.`,
       lineChart(days,[{label:"Weight",color:"var(--weight)",dash:false,vals:wV}],wMin,wMax,v=>Math.round(v)," "+wUnit),
       "");
+  }
+
+  if(hasBowel){
+    const total=bmV.reduce((a,b)=>a+b,0);
+    charts+=card("Bowel movements",`${total} in ${trend.days}d`,"Number per day. Hover for Bristol type.",
+      barChart(days,bmV,0,niceTop(maxBM,1),"var(--bowel)",v=>Math.round(v),
+        (d,v)=>{ const types=d.bristol.length?`type ${[...new Set(d.bristol)].sort((a,b)=>a-b).join(", ")}`:"type not noted";
+          return `<b>${fmtDayShort(d.date)}</b><br>${v||0} movement${v===1?"":"s"} · ${types}`; }));
   }
 
   app().innerHTML=`<h1>Trends</h1><p class="sub">How things move over the last ${trend.days} days. Tap or hover a point for detail.</p>
@@ -1359,6 +1426,13 @@ function reportHTML(from,to){
   const wFirst=weights.length?toU(weights[0]):null, wLast=weights.length?toU(weights[weights.length-1]):null;
   const wChange=(wFirst!=null&&wLast!=null)?wLast-wFirst:null;
 
+  // bowel movements
+  const bmDays=Math.max(1,sumRange.days);
+  const bms=DB.bowel.filter(x=>inRange(x.timestamp,from,to)).sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
+  const bmBristol=bms.map(x=>x.bristol).filter(x=>x!=null);
+  const bmPerDay=bms.length/bmDays;
+  const BM_TYPE=["","hard lumps","lumpy","cracked","smooth","soft blobs","mushy","liquid"];
+
   // symptom frequency
   const freq={};
   sy.forEach(s=>{ const k=s.name.trim(); if(!freq[k]) freq[k]={n:0,sev:[],dur:[]}; freq[k].n++; if(s.severity!=null)freq[k].sev.push(s.severity); if(s.durationMinutes)freq[k].dur.push(Number(s.durationMinutes)); });
@@ -1405,6 +1479,7 @@ function reportHTML(from,to){
       <div class="stat card"><div class="k">Avg mood</div><div class="v">${moodAvg!=null?`${moodFace(Math.round(moodAvg))} ${moodAvg.toFixed(1)}/5`:"—"}</div><div class="s">${moods.length} check-in${moods.length===1?"":"s"}${enAvg!=null?` · energy ${enAvg.toFixed(1)}/5`:""}</div></div>
       <div class="stat card"><div class="k">Soul time</div><div class="v">${soul.length}</div><div class="s">${soulMin?`${durHuman(soulMin)} total`:"sessions"}</div></div>
       <div class="stat card"><div class="k">Weight</div><div class="v">${wLast!=null?`${round1(wLast)} ${wUnit}`:"—"}</div><div class="s">${wChange!=null?`${wChange>=0?"+":""}${round1(wChange)} ${wUnit} over range`:`${weights.length} weigh-ins`}</div></div>
+      <div class="stat card"><div class="k">Bowel</div><div class="v">${bms.length}</div><div class="s">${bms.length?`${round1(bmPerDay)}/day${bmBristol.length?` · avg type ${round1(avg(bmBristol))}`:""}`:"movements"}</div></div>
     </div>
 
     <table><caption>Symptoms — frequency</caption>
@@ -1430,6 +1505,16 @@ function reportHTML(from,to){
     <table><caption>Weight${wChange!=null?` — ${wChange>=0?"+":""}${round1(wChange)} ${wUnit} over range`:""}</caption>
       <thead><tr><th>When</th><th>Weight</th><th>Notes</th></tr></thead>
       <tbody>${weights.slice().reverse().map(w=>`<tr><td>${fmtDateTime(w.timestamp)}</td><td>${w.weight} ${esc(w.unit||wUnit)}</td><td>${esc(w.notes||"")}</td></tr>`).join("")||`<tr><td colspan="3" class="muted">None in range.</td></tr>`}</tbody>
+    </table>
+
+    <table><caption>Bowel movements${bms.length?` — ${bms.length} in range, ${round1(bmPerDay)}/day${bmBristol.length?`, avg Bristol type ${round1(avg(bmBristol))}`:""}`:""}</caption>
+      <thead><tr><th>When</th><th>Bristol type</th><th>Flags</th><th>Notes</th></tr></thead>
+      <tbody>${bms.map(x=>`<tr>
+        <td>${fmtDateTime(x.timestamp)}</td>
+        <td>${x.bristol?`${x.bristol} — ${BM_TYPE[x.bristol]||""}`:"—"}</td>
+        <td>${x.flags&&x.flags.length?esc(x.flags.join(", ")):"—"}</td>
+        <td>${esc(x.notes||"")}</td>
+      </tr>`).join("")||`<tr><td colspan="4" class="muted">None in range.</td></tr>`}</tbody>
     </table>
 
     <table><caption>Mood${topTags?` — common: ${esc(topTags)}`:""}</caption>
@@ -1468,7 +1553,7 @@ function reportHTML(from,to){
 /* ============================================================
    ADD FROM CLAUDE  (merge a scribe-produced block, additively)
    ============================================================ */
-const INGEST_LABEL={symptoms:"symptoms",medDoses:"med doses",bp:"BP readings",sleep:"sleep",meals:"meals",moods:"moods",soul:"soul time",weights:"weigh-ins"};
+const INGEST_LABEL={symptoms:"symptoms",medDoses:"med doses",bp:"BP readings",sleep:"sleep",meals:"meals",moods:"moods",soul:"soul time",weights:"weigh-ins",bowel:"bowel movements"};
 function mergeArray(targetKey, incoming){
   const target=DB[targetKey]; let added=0;
   incoming.forEach(item=>{
@@ -1712,7 +1797,7 @@ if("serviceWorker" in navigator){
    Scope: drive.file — the app can only see files it creates.
    ============================================================ */
 const SYNC = { connected:false, status:null, _resolve:null, _reject:null };
-const SYNC_ARRAYS = ["symptoms","meds","medDoses","bp","sleep","meals","moods","soul","weights"];
+const SYNC_ARRAYS = ["symptoms","meds","medDoses","bp","sleep","meals","moods","soul","weights","bowel"];
 const DRIVE_FILE = "health-log-data.json";
 let accessToken=null, tokenExpiry=0, tokenClient=null, syncing=false, syncTimer=null;
 
