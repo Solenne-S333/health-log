@@ -1,12 +1,13 @@
 /* Health Log service worker — offline app shell.
    Bump CACHE when the app files change so clients update. */
-const CACHE = "healthlog-v7";
+const CACHE = "healthlog-v8";
 const SHELL = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
   "./icon-192.png",
   "./icon-512.png",
+  "./favicon-32.png",
 ];
 
 self.addEventListener("install", e => {
