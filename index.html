@@ -1791,6 +1791,17 @@ function isStandalone(){ return window.matchMedia("(display-mode: standalone)").
 if("serviceWorker" in navigator){
   window.addEventListener("load",()=>{ navigator.serviceWorker.register("./sw.js").catch(()=>{}); });
 }
+/* Ask the browser to keep this app's local data instead of evicting it under
+   storage pressure or a routine clear. Best-effort: some browsers only grant it
+   for installed / frequently-used sites, and a deliberate "clear site data"
+   still wipes it — but it makes accidental eviction much less likely. */
+async function requestPersistentStorage(){
+  try{
+    if(!navigator.storage || !navigator.storage.persist) return;
+    if(await navigator.storage.persisted()) return;   // already granted
+    await navigator.storage.persist();                // may resolve false; harmless
+  }catch(e){}
+}
 
 /* ============================================================
    GOOGLE DRIVE SYNC  (phone <-> laptop, via the user's own Drive)
@@ -1909,6 +1920,7 @@ async function syncNow(interactive){
     localStorage.setItem("healthlog.connected","1");
     localStorage.setItem("healthlog.lastSync", nowISO());
     SYNC.connected=true; SYNC.status=null;
+    if(interactive) requestPersistentStorage();
     render();
     if(interactive) toast("✓ Synced with Drive");
   }catch(e){
@@ -1993,7 +2005,7 @@ function showWelcome(){
     </ul>
     <div class="actions"><button class="btn primary" id="wok">Start</button></div>`;
   sheet("Welcome to Health Log 🌿", inner, (root,close)=>{
-    root.querySelector("#wok").onclick=()=>{ try{localStorage.setItem("healthlog.welcomed","1");}catch(e){} close(); };
+    root.querySelector("#wok").onclick=()=>{ try{localStorage.setItem("healthlog.welcomed","1");}catch(e){} requestPersistentStorage(); close(); };
   });
 }
 function maybeWelcome(){
@@ -2014,6 +2026,7 @@ function sendFeedback(){
 render();
 initSyncOnBoot();
 maybeWelcome();
+requestPersistentStorage();
 </script>
 </body>
 </html>
